@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Responses\ChatResponse;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\AssertionFailedError;
 
 it('returns the queued reply from respondWith()', function (): void {
     $client = new FakeClient;
@@ -50,7 +51,7 @@ it('assertSentPrompt passes when the callable returns true for a recorded prompt
     $client->chat([['role' => 'user', 'content' => 'hello']]);
 
     expect(fn () => $client->assertSentPrompt(fn (array $messages) => $messages[0]['content'] === 'hello'))
-        ->not->toThrow(\Throwable::class);
+        ->not->toThrow(Throwable::class);
 });
 
 it('assertSentPrompt fails when no recorded prompt matches', function (): void {
@@ -60,5 +61,5 @@ it('assertSentPrompt fails when no recorded prompt matches', function (): void {
     $client->chat([['role' => 'user', 'content' => 'hello']]);
 
     expect(fn () => $client->assertSentPrompt(fn (array $messages) => $messages[0]['content'] === 'NEVER'))
-        ->toThrow(\PHPUnit\Framework\AssertionFailedError::class);
+        ->toThrow(AssertionFailedError::class);
 });

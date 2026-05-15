@@ -33,6 +33,7 @@ function parseSseResponse(string $raw): array
                 $events[] = $current;
                 $current = [];
             }
+
             continue;
         }
 

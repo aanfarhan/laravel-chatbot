@@ -7,6 +7,7 @@ namespace Aanfarhan\Chatbot\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -16,10 +17,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $input_tokens
  * @property int $output_tokens
  * @property int $cost_cents
- * @property \Illuminate\Support\Carbon|null $last_message_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon|null $last_message_at
+ * @property Carbon|null $deleted_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 final class Conversation extends Model
 {

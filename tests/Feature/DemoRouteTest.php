@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 uses(InteractsWithChatbot::class);
 
 beforeEach(function (): void {

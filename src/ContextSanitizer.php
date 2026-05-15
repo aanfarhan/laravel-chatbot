@@ -44,9 +44,7 @@ final class ContextSanitizer
     }
 
     /**
-     * @param  mixed  $value
      * @param  list<string>  $keyPaths
-     * @return mixed
      */
     private function walk(mixed $value, string $path, array &$keyPaths): mixed
     {

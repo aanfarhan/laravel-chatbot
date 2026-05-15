@@ -7,6 +7,7 @@ use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 uses(InteractsWithChatbot::class);
@@ -28,7 +29,7 @@ beforeEach(function (): void {
     })->name('orders.show');
 });
 
-function streamAllCh(\Illuminate\Testing\TestResponse $response): void
+function streamAllCh(TestResponse $response): void
 {
     ob_start();
     $response->baseResponse->sendContent();
@@ -97,7 +98,7 @@ it('channel-A envelope is rejected when posted to channel B', function (): void 
     streamAllCh($r2);
 
     // Two separate conversations were created (different channels)
-    expect(\DB::table('chatbot_conversations')->count())->toBe(2);
+    expect(DB::table('chatbot_conversations')->count())->toBe(2);
 });
 
 it('two channels use separate cookies and do not bleed conversations', function (): void {
@@ -116,7 +117,7 @@ it('two channels use separate cookies and do not bleed conversations', function 
     streamAllCh($r2);
     $r2->assertCookie('chatbot_conversation_admin');
 
-    expect(\DB::table('chatbot_conversations')->count())->toBe(2)
-        ->and(\DB::table('chatbot_conversations')->pluck('channel')->sort()->values()->toArray())
+    expect(DB::table('chatbot_conversations')->count())->toBe(2)
+        ->and(DB::table('chatbot_conversations')->pluck('channel')->sort()->values()->toArray())
         ->toBe(['admin', 'default']);
 });

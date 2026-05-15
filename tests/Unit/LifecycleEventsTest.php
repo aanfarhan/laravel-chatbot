@@ -11,6 +11,7 @@ use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Events\Dispatcher;
+use Psr\Log\LoggerInterface;
 
 function lifecycleRecord(): MessageRecord
 {
@@ -118,7 +119,7 @@ it('writes a [chatbot] log line with all fields after a successful turn', functi
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->once()->andReturn(lifecycleRecord());
 
-    $logger = Mockery::mock(\Psr\Log\LoggerInterface::class);
+    $logger = Mockery::mock(LoggerInterface::class);
     $logger->shouldReceive('info')->once()->withArgs(function (string $message, array $context): bool {
         return str_starts_with($message, '[chatbot]')
             && isset($context['conversation_id'])
@@ -154,7 +155,7 @@ it('writes a [chatbot] log line with error_code on a failed turn', function (): 
     $events = Mockery::mock(Dispatcher::class);
     $events->shouldReceive('dispatch')->zeroOrMoreTimes();
 
-    $logger = Mockery::mock(\Psr\Log\LoggerInterface::class);
+    $logger = Mockery::mock(LoggerInterface::class);
     $logger->shouldReceive('info')->once()->withArgs(function (string $message, array $context): bool {
         return str_starts_with($message, '[chatbot]')
             && isset($context['error_code'])

@@ -75,6 +75,7 @@ function parseSseToEvents(string $raw): array
                 $events[] = $current;
                 $current = [];
             }
+
             continue;
         }
 

@@ -2,6 +2,10 @@
 
 Use `/Users/farhan/Library/Application Support/Herd/bin/php83` to run PHP commands (tests, artisan, etc.). The system default `php` is 8.2 and will fail platform checks.
 
+## Code formatting
+
+After every PHP file change or new PHP file creation, run `vendor/bin/pint` to auto-fix formatting. Do not skip this — the CI runs `vendor/bin/pint --test` and will fail if formatting is off.
+
 ## Agent skills
 
 ### Issue tracker

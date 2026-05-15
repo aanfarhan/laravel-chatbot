@@ -7,6 +7,7 @@ use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 uses(InteractsWithChatbot::class);
@@ -22,7 +23,7 @@ beforeEach(function (): void {
     })->name('orders.show');
 });
 
-function postAndStream(\Illuminate\Testing\TestResponse $response): void
+function postAndStream(TestResponse $response): void
 {
     ob_start();
     $response->baseResponse->sendContent();
@@ -40,9 +41,9 @@ it('starts a new conversation after the idle window expires', function (): void 
     ])->assertOk();
     postAndStream($r1);
 
-    $convId = \DB::table('chatbot_conversations')->value('id');
+    $convId = DB::table('chatbot_conversations')->value('id');
 
-    \DB::table('chatbot_conversations')->update(['last_message_at' => now()->subSeconds(20)]);
+    DB::table('chatbot_conversations')->update(['last_message_at' => now()->subSeconds(20)]);
 
     $r2 = $this->withCredentials()
         ->withUnencryptedCookie('chatbot_conversation_default', (string) $convId)
@@ -52,7 +53,7 @@ it('starts a new conversation after the idle window expires', function (): void 
         ])->assertOk();
     postAndStream($r2);
 
-    expect(\DB::table('chatbot_conversations')->count())->toBe(2);
+    expect(DB::table('chatbot_conversations')->count())->toBe(2);
 });
 
 it('reuses the same conversation on the second POST when cookie is carried', function (): void {
@@ -65,7 +66,7 @@ it('reuses the same conversation on the second POST when cookie is carried', fun
     ])->assertOk();
     postAndStream($r1);
 
-    $conversationId = \DB::table('chatbot_conversations')->value('id');
+    $conversationId = DB::table('chatbot_conversations')->value('id');
 
     $r2 = $this->withCredentials()
         ->withUnencryptedCookie('chatbot_conversation_default', (string) $conversationId)
@@ -75,8 +76,8 @@ it('reuses the same conversation on the second POST when cookie is carried', fun
         ])->assertOk();
     postAndStream($r2);
 
-    expect(\DB::table('chatbot_conversations')->count())->toBe(1)
-        ->and(\DB::table('chatbot_messages')->count())->toBe(4);
+    expect(DB::table('chatbot_conversations')->count())->toBe(1)
+        ->and(DB::table('chatbot_messages')->count())->toBe(4);
 });
 
 it('sets the conversation cookie on the first POST', function (): void {

@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 uses(InteractsWithChatbot::class);
@@ -24,7 +25,7 @@ beforeEach(function (): void {
     })->name('orders.show');
 });
 
-function streamAllCmpl(\Illuminate\Testing\TestResponse $response): void
+function streamAllCmpl(TestResponse $response): void
 {
     ob_start();
     $response->baseResponse->sendContent();

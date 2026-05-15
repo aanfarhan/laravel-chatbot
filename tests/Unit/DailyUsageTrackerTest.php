@@ -17,7 +17,7 @@ it('returns zeros when there are no messages today', function (): void {
 });
 
 it('sums input and output tokens from today\'s messages for the matching user+channel', function (): void {
-    $convId = \DB::table('chatbot_conversations')->insertGetId([
+    $convId = DB::table('chatbot_conversations')->insertGetId([
         'channel' => 'default',
         'user_id' => 42,
         'guest_token' => null,
@@ -28,7 +28,7 @@ it('sums input and output tokens from today\'s messages for the matching user+ch
         'updated_at' => now(),
     ]);
 
-    \DB::table('chatbot_messages')->insert([
+    DB::table('chatbot_messages')->insert([
         ['conversation_id' => $convId, 'role' => 'user',      'content' => 'hi',    'route_name' => '', 'context_hash' => '', 'input_tokens' => 1000, 'output_tokens' => 0,   'cost_cents' => 0, 'error' => null, 'created_at' => now()],
         ['conversation_id' => $convId, 'role' => 'assistant', 'content' => 'hello', 'route_name' => '', 'context_hash' => '', 'input_tokens' => 1000, 'output_tokens' => 300, 'cost_cents' => 0, 'error' => null, 'created_at' => now()],
     ]);
@@ -41,7 +41,7 @@ it('sums input and output tokens from today\'s messages for the matching user+ch
 });
 
 it('excludes messages from a different channel', function (): void {
-    $convId = \DB::table('chatbot_conversations')->insertGetId([
+    $convId = DB::table('chatbot_conversations')->insertGetId([
         'channel' => 'admin',
         'user_id' => 42,
         'guest_token' => null,
@@ -52,7 +52,7 @@ it('excludes messages from a different channel', function (): void {
         'updated_at' => now(),
     ]);
 
-    \DB::table('chatbot_messages')->insert([
+    DB::table('chatbot_messages')->insert([
         ['conversation_id' => $convId, 'role' => 'assistant', 'content' => 'x', 'route_name' => '', 'context_hash' => '', 'input_tokens' => 5000, 'output_tokens' => 1000, 'cost_cents' => 0, 'error' => null, 'created_at' => now()],
     ]);
 
@@ -63,7 +63,7 @@ it('excludes messages from a different channel', function (): void {
 });
 
 it('excludes messages from yesterday (UTC midnight boundary)', function (): void {
-    $convId = \DB::table('chatbot_conversations')->insertGetId([
+    $convId = DB::table('chatbot_conversations')->insertGetId([
         'channel' => 'default',
         'user_id' => 7,
         'guest_token' => null,
@@ -74,7 +74,7 @@ it('excludes messages from yesterday (UTC midnight boundary)', function (): void
         'updated_at' => now(),
     ]);
 
-    \DB::table('chatbot_messages')->insert([
+    DB::table('chatbot_messages')->insert([
         ['conversation_id' => $convId, 'role' => 'assistant', 'content' => 'x', 'route_name' => '', 'context_hash' => '', 'input_tokens' => 9999, 'output_tokens' => 9999, 'cost_cents' => 0, 'error' => null, 'created_at' => now()->utc()->subDay()],
     ]);
 

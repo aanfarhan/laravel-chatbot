@@ -39,7 +39,7 @@ final class StreamCoordinator
         int $conversationId,
         string $routeName,
         string $contextHash,
-        callable $isAborted = null,
+        ?callable $isAborted = null,
         ?string $model = null,
         ?callable $preflight = null,
         ?string $contextSummary = null,

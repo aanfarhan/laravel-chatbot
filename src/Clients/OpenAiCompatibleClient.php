@@ -74,7 +74,6 @@ final class OpenAiCompatibleClient implements LLMClient
 
     /**
      * @param  list<array{role: string, content: string}>  $messages
-     *
      * @return \Generator<StreamChunk>
      */
     private function doStream(array $messages, ?string $model): \Generator

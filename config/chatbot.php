@@ -27,7 +27,7 @@ return [
     */
     'throttle' => [
         'per_minute' => (int) env('CHATBOT_THROTTLE_PER_MINUTE', 20),
-        'per_day'    => (int) env('CHATBOT_THROTTLE_PER_DAY', 200),
+        'per_day' => (int) env('CHATBOT_THROTTLE_PER_DAY', 200),
     ],
 
     /*
@@ -49,7 +49,7 @@ return [
     | ChatbotQuotaExceededException (surfaced as an SSE error event).
     */
     'daily_quota' => [
-        'input'  => (int) env('CHATBOT_DAILY_QUOTA_INPUT', 200000),
+        'input' => (int) env('CHATBOT_DAILY_QUOTA_INPUT', 200000),
         'output' => (int) env('CHATBOT_DAILY_QUOTA_OUTPUT', 50000),
     ],
 

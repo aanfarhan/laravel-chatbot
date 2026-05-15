@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Aanfarhan\Chatbot\ContextNormalizer;
 use Illuminate\Contracts\Support\Arrayable;
-use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Log;
 
 it('passes plain arrays through unchanged', function (): void {

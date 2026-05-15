@@ -6,6 +6,7 @@ namespace Aanfarhan\Chatbot\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $route_name
  * @property string $context_hash
  * @property array<string, mixed>|null $error
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $created_at
  */
 final class Message extends Model
 {

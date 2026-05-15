@@ -32,7 +32,7 @@ it('hard-deletes all conversations with --hard flag', function (): void {
 
 it('only deletes conversations in the specified channel', function (): void {
     $support = Conversation::create(['channel' => 'support', 'user_id' => 9]);
-    $admin   = Conversation::create(['channel' => 'admin',   'user_id' => 9]);
+    $admin = Conversation::create(['channel' => 'admin',   'user_id' => 9]);
 
     $this->artisan('chatbot:delete-user', ['id' => 9, '--channel' => 'support'])->assertExitCode(0);
 

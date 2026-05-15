@@ -30,7 +30,7 @@ it('hard-deletes conversations for a guest token with --hard', function (): void
 
 it('does not affect conversations for other guest tokens', function (): void {
     $target = Conversation::create(['channel' => 'default', 'guest_token' => 'tok-target']);
-    $other  = Conversation::create(['channel' => 'default', 'guest_token' => 'tok-other']);
+    $other = Conversation::create(['channel' => 'default', 'guest_token' => 'tok-other']);
 
     $this->artisan('chatbot:delete-guest', ['token' => 'tok-target'])->assertExitCode(0);
 

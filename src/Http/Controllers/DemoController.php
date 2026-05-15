@@ -18,10 +18,10 @@ final class DemoController
         }
 
         $order = [
-            'id'      => 'ORD-1042',
+            'id' => 'ORD-1042',
             'product' => 'Wireless Headphones',
-            'status'  => 'Shipped',
-            'total'   => '$89.99',
+            'status' => 'Shipped',
+            'total' => '$89.99',
         ];
 
         Chatbot::context(['order' => $order]);

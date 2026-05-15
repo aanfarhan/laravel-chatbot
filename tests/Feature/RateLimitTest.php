@@ -7,6 +7,7 @@ use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 uses(InteractsWithChatbot::class);
@@ -22,7 +23,7 @@ beforeEach(function (): void {
     })->name('orders.show');
 });
 
-function streamAllRl(\Illuminate\Testing\TestResponse $response): void
+function streamAllRl(TestResponse $response): void
 {
     ob_start();
     $response->baseResponse->sendContent();

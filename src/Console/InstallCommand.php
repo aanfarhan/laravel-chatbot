@@ -50,8 +50,8 @@ final class InstallCommand extends Command
 
         $defaults = [
             'CHATBOT_BASE_URL' => 'https://api.openai.com/v1',
-            'CHATBOT_API_KEY'  => '',
-            'CHATBOT_MODEL'    => 'gpt-4o-mini',
+            'CHATBOT_API_KEY' => '',
+            'CHATBOT_MODEL' => 'gpt-4o-mini',
         ];
 
         $existing = file_exists($envPath) ? (string) file_get_contents($envPath) : '';
@@ -121,9 +121,9 @@ final class InstallCommand extends Command
     {
         return match ($envKey) {
             'CHATBOT_BASE_URL' => 'LLM provider base URL',
-            'CHATBOT_API_KEY'  => 'LLM API key',
-            'CHATBOT_MODEL'    => 'LLM model name',
-            default            => $envKey,
+            'CHATBOT_API_KEY' => 'LLM API key',
+            'CHATBOT_MODEL' => 'LLM model name',
+            default => $envKey,
         };
     }
 }

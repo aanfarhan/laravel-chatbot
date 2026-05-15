@@ -7,6 +7,7 @@ namespace Aanfarhan\Chatbot\Console;
 use Aanfarhan\Chatbot\Models\Conversation;
 use Aanfarhan\Chatbot\Models\Message;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
 
 final class ExportUserCommand extends Command
 {
@@ -34,7 +35,7 @@ final class ExportUserCommand extends Command
         return self::SUCCESS;
     }
 
-    /** @param \Illuminate\Database\Eloquent\Collection<int, Conversation> $conversations */
+    /** @param Collection<int, Conversation> $conversations */
     private function outputJson(int $userId, $conversations): void
     {
         $data = [
@@ -55,7 +56,7 @@ final class ExportUserCommand extends Command
         $this->line(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
-    /** @param \Illuminate\Database\Eloquent\Collection<int, Conversation> $conversations */
+    /** @param Collection<int, Conversation> $conversations */
     private function outputCsv(int $userId, $conversations): void
     {
         $this->line('conversation_id,channel,role,content,created_at');

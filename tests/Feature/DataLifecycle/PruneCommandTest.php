@@ -77,7 +77,7 @@ it('respects per-channel retention_days override', function (): void {
         'chatbot.retention_days' => 30,
         'chatbot.channels' => [
             'premium' => ['retention_days' => null],
-            'temp'    => ['retention_days' => 7],
+            'temp' => ['retention_days' => 7],
         ],
     ]);
 

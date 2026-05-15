@@ -8,6 +8,7 @@ use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 
@@ -24,7 +25,7 @@ beforeEach(function (): void {
     })->name('orders.show');
 });
 
-function streamAndGetTokens(\Illuminate\Testing\TestResponse $response): array
+function streamAndGetTokens(TestResponse $response): array
 {
     ob_start();
     $response->baseResponse->sendContent();
@@ -45,7 +46,7 @@ function streamAndGetTokens(\Illuminate\Testing\TestResponse $response): array
     return $tokens;
 }
 
-function streamAll(\Illuminate\Testing\TestResponse $response): void
+function streamAll(TestResponse $response): void
 {
     ob_start();
     $response->baseResponse->sendContent();

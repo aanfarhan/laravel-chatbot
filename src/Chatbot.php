@@ -69,9 +69,6 @@ final class Chatbot
         return $this;
     }
 
-    /**
-     * @param  callable|string  $summary
-     */
     public function summary(callable|string $summary): self
     {
         $this->channelSummaries['default'] = $summary;
@@ -86,6 +83,7 @@ final class Chatbot
 
     /**
      * @param  array<string, mixed>  $context
+     *
      * @internal
      */
     public function setChannelContext(string $channel, array $context): void
@@ -106,7 +104,6 @@ final class Chatbot
     }
 
     /**
-     * @param  callable|string  $summary
      * @internal
      */
     public function setChannelSummary(string $channel, callable|string $summary): void

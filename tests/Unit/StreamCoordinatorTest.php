@@ -6,6 +6,7 @@ use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 
 function parseSseEvents(string $raw): array
@@ -19,6 +20,7 @@ function parseSseEvents(string $raw): array
                 $events[] = $current;
                 $current = [];
             }
+
             continue;
         }
 
@@ -90,7 +92,7 @@ it('tears down the upstream stream and decrements counter on client abort', func
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
 
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Repository::class);
+    $cache = Mockery::mock(Repository::class);
     $cache->shouldReceive('increment')->once();
     $cache->shouldReceive('decrement')->once();
 
@@ -123,7 +125,7 @@ it('increments the active-stream counter on start and decrements on success', fu
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
 
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Repository::class);
+    $cache = Mockery::mock(Repository::class);
     $cache->shouldReceive('increment')->with('chatbot.active_streams')->once();
     $cache->shouldReceive('decrement')->with('chatbot.active_streams')->once();
 

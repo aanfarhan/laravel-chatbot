@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot\Http\Controllers;
 
 use Aanfarhan\Chatbot\Chatbot;
+use Aanfarhan\Chatbot\ContextSanitizer;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
-use Aanfarhan\Chatbot\ContextSanitizer;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
 use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
@@ -22,7 +22,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class MessagesController

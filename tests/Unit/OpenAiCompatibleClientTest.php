@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Aanfarhan\Chatbot\Clients\OpenAiCompatibleClient;
+use Aanfarhan\Chatbot\Exceptions\ChatbotConfigurationException;
+use Aanfarhan\Chatbot\Exceptions\ChatbotProviderException;
 use Aanfarhan\Chatbot\Responses\ChatResponse;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Handler\MockHandler;
@@ -71,7 +73,7 @@ it('throws ChatbotConfigurationException when apiKey is empty', function (): voi
     $client = new OpenAiCompatibleClient($guzzle, 'https://api.openai.com/v1', '', 'gpt-4o-mini');
 
     $client->stream([['role' => 'user', 'content' => 'hi']]);
-})->throws(\Aanfarhan\Chatbot\Exceptions\ChatbotConfigurationException::class);
+})->throws(ChatbotConfigurationException::class);
 
 it('throws ChatbotProviderException with retryable=true on HTTP 429', function (): void {
     $mock = new MockHandler([new Response(429, [], 'Too Many Requests')]);
@@ -81,7 +83,7 @@ it('throws ChatbotProviderException with retryable=true on HTTP 429', function (
     try {
         iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']]));
         expect(false)->toBeTrue('expected exception');
-    } catch (\Aanfarhan\Chatbot\Exceptions\ChatbotProviderException $e) {
+    } catch (ChatbotProviderException $e) {
         expect($e->isRetryable())->toBeTrue();
         expect($e->code())->toBe('provider_error');
     }

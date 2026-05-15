@@ -22,6 +22,7 @@ function decodedSseEvents(string $raw): array
                 $events[] = $current;
                 $current = [];
             }
+
             continue;
         }
         if (str_starts_with($line, 'event:')) {
@@ -194,7 +195,7 @@ it('channel default greeting used when per-route greeting not declared', functio
     preg_match('/signed-context="([^"]+)"/', $html, $m);
     $token = htmlspecialchars_decode($m[1], ENT_QUOTES);
 
-    $envelope = app(\Aanfarhan\Chatbot\Envelopes\ContextEnvelope::class)->verify($token);
+    $envelope = app(ContextEnvelope::class)->verify($token);
 
     expect($envelope->greeting)->toBe('Welcome, admin!');
 });
@@ -246,7 +247,7 @@ it('prompt, greeting, and summary are chainable on Chatbot::channel() scope', fu
     preg_match('/signed-context="([^"]+)"/', $html, $m);
     $adminToken = htmlspecialchars_decode($m[1], ENT_QUOTES);
 
-    $envelope = app(\Aanfarhan\Chatbot\Envelopes\ContextEnvelope::class)->verify($adminToken);
+    $envelope = app(ContextEnvelope::class)->verify($adminToken);
 
     expect($envelope->greeting)->toBe('Hello admin!')
         ->and($envelope->prompt)->toBe('Admin-only instructions.')

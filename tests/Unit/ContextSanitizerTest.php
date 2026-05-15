@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Aanfarhan\Chatbot\ContextSanitizer;
+use Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected;
+use Illuminate\Support\Facades\Event;
 
 it('escapes </context> in a top-level string value', function (): void {
     $sanitizer = new ContextSanitizer;
@@ -89,9 +91,11 @@ it('passes clean strings through byte-for-byte', function (): void {
 
 it('fires ChatbotSuspiciousContextDetected exactly once when a rewrite occurs', function (): void {
     $fired = [];
-    \Illuminate\Support\Facades\Event::listen(
-        \Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected::class,
-        function ($event) use (&$fired): void { $fired[] = $event; },
+    Event::listen(
+        ChatbotSuspiciousContextDetected::class,
+        function ($event) use (&$fired): void {
+            $fired[] = $event;
+        },
     );
 
     $sanitizer = new ContextSanitizer;
@@ -102,9 +106,11 @@ it('fires ChatbotSuspiciousContextDetected exactly once when a rewrite occurs', 
 
 it('does not fire the event when no rewrites occur', function (): void {
     $fired = [];
-    \Illuminate\Support\Facades\Event::listen(
-        \Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected::class,
-        function ($event) use (&$fired): void { $fired[] = $event; },
+    Event::listen(
+        ChatbotSuspiciousContextDetected::class,
+        function ($event) use (&$fired): void {
+            $fired[] = $event;
+        },
     );
 
     $sanitizer = new ContextSanitizer;
@@ -114,11 +120,13 @@ it('does not fire the event when no rewrites occur', function (): void {
 });
 
 it('event carries the key paths of rewritten values', function (): void {
-    /** @var \Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected|null $event */
+    /** @var ChatbotSuspiciousContextDetected|null $event */
     $event = null;
-    \Illuminate\Support\Facades\Event::listen(
-        \Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected::class,
-        function ($e) use (&$event): void { $event = $e; },
+    Event::listen(
+        ChatbotSuspiciousContextDetected::class,
+        function ($e) use (&$event): void {
+            $event = $e;
+        },
     );
 
     $sanitizer = new ContextSanitizer;
@@ -134,11 +142,13 @@ it('event carries the key paths of rewritten values', function (): void {
 });
 
 it('event carries the sanitized payload', function (): void {
-    /** @var \Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected|null $event */
+    /** @var ChatbotSuspiciousContextDetected|null $event */
     $event = null;
-    \Illuminate\Support\Facades\Event::listen(
-        \Aanfarhan\Chatbot\Events\ChatbotSuspiciousContextDetected::class,
-        function ($e) use (&$event): void { $event = $e; },
+    Event::listen(
+        ChatbotSuspiciousContextDetected::class,
+        function ($e) use (&$event): void {
+            $event = $e;
+        },
     );
 
     $sanitizer = new ContextSanitizer;

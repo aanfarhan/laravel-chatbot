@@ -35,9 +35,6 @@ final class ChannelScope
         return $this;
     }
 
-    /**
-     * @param  callable|string  $summary
-     */
     public function summary(callable|string $summary): self
     {
         $this->chatbot->setChannelSummary($this->channel, $summary);

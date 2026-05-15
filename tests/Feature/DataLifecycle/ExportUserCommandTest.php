@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Aanfarhan\Chatbot\Models\Conversation;
 use Aanfarhan\Chatbot\Models\Message;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 
 uses(RefreshDatabase::class);
 
@@ -21,10 +22,10 @@ it('outputs a versioned JSON export for a user', function (): void {
         'created_at' => now(),
     ]);
 
-    $exitCode = \Illuminate\Support\Facades\Artisan::call('chatbot:export-user', ['id' => 3]);
+    $exitCode = Artisan::call('chatbot:export-user', ['id' => 3]);
     expect($exitCode)->toBe(0);
 
-    $json = json_decode(\Illuminate\Support\Facades\Artisan::output(), true);
+    $json = json_decode(Artisan::output(), true);
 
     expect($json['format'])->toBe('chatbot-export@1')
         ->and($json['user_id'])->toBe(3)
