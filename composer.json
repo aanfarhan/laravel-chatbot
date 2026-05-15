@@ -1,0 +1,66 @@
+{
+    "name": "aanfarhan/laravel-chatbot",
+    "description": "Context-aware chatbot package for Laravel: signed page context, OpenAI-compatible LLMs, streaming SSE, GDPR-friendly persistence.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "chatbot", "ai", "llm", "openai", "sse"],
+    "authors": [
+        {
+            "name": "Aan Farhan",
+            "email": "abaz.nurfarhana@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^11.0 || ^12.0",
+        "illuminate/http": "^11.0 || ^12.0",
+        "illuminate/routing": "^11.0 || ^12.0",
+        "illuminate/support": "^11.0 || ^12.0",
+        "guzzlehttp/guzzle": "^7.8"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.18",
+        "orchestra/testbench": "^9.0 || ^10.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0",
+        "phpstan/phpstan": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Aanfarhan\\Chatbot\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Aanfarhan\\Chatbot\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Aanfarhan\\Chatbot\\ChatbotServiceProvider"
+            ],
+            "aliases": {
+                "Chatbot": "Aanfarhan\\Chatbot\\Facades\\Chatbot"
+            }
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.3.30"
+        },
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "analyse": "phpstan analyse",
+        "format": "pint",
+        "lint": "pint --test"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

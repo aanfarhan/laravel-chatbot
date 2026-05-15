@@ -1,0 +1,104 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Aanfarhan\Chatbot;
+
+use Aanfarhan\Chatbot\Clients\FakeClient;
+use Aanfarhan\Chatbot\Clients\OpenAiCompatibleClient;
+use Aanfarhan\Chatbot\Contracts\ConversationStore;
+use Aanfarhan\Chatbot\Contracts\LLMClient;
+use Aanfarhan\Chatbot\ContextSanitizer;
+use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
+use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
+use Aanfarhan\Chatbot\PromptAssembler;
+use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
+use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\ServiceProvider;
+
+final class ChatbotServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->mergeConfigFrom(__DIR__.'/../config/chatbot.php', 'chatbot');
+
+        $this->app->singleton(Chatbot::class, fn (Application $app): Chatbot => new Chatbot($app));
+
+        $this->app->singleton(
+            ContextEnvelope::class,
+            fn (Application $app): ContextEnvelope => new ContextEnvelope($app->make('config')),
+        );
+
+        $this->app->singleton(
+            PromptAssembler::class,
+            fn (): PromptAssembler => new PromptAssembler,
+        );
+
+        $this->app->singleton(
+            ContextSanitizer::class,
+            function (Application $app): ContextSanitizer {
+                /** @var Repository $config */
+                $config = $app->make('config');
+                /** @var list<string> $tags */
+                $tags = (array) $config->get('chatbot.sanitizer_tags', []);
+
+                return new ContextSanitizer($tags);
+            },
+        );
+
+        $this->app->singleton(ConversationStore::class, fn (): EloquentConversationStore => new EloquentConversationStore);
+
+        $this->app->singleton(LLMClient::class, function (Application $app): LLMClient {
+            /** @var Repository $config */
+            $config = $app->make('config');
+
+            if ($config->get('chatbot.demo.enabled', false)) {
+                return (new FakeClient)
+                    ->respondWithStream(['Sure! ', 'Order #ORD-1042 ', 'has been shipped ', 'and should arrive ', 'within 2–3 business days.'])
+                    ->respondWithStream(['Is there ', 'anything else ', 'I can help you with?'])
+                    ->respondWithStream(['Happy to help! ', 'Feel free to ask me anything ', 'about your order.']);
+            }
+
+            return new OpenAiCompatibleClient(
+                new GuzzleClient,
+                baseUrl: $config->string('chatbot.base_url'),
+                apiKey: $config->string('chatbot.api_key', ''),
+                model: $config->string('chatbot.model'),
+            );
+        });
+    }
+
+    public function boot(): void
+    {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadRoutesFrom(__DIR__.'/../routes/chatbot.php');
+        $this->loadRoutesFrom(__DIR__.'/../routes/chatbot-demo.php');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'chatbot');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                Console\InstallCommand::class,
+                Console\DemoCommand::class,
+                Console\PruneCommand::class,
+                Console\DeleteUserCommand::class,
+                Console\ExportUserCommand::class,
+                Console\AnonymizeUserCommand::class,
+                Console\DeleteGuestCommand::class,
+                Console\InspectPromptCommand::class,
+            ]);
+        }
+
+        $this->publishes([
+            __DIR__.'/../config/chatbot.php' => $this->app->configPath('chatbot.php'),
+        ], 'chatbot-config');
+
+        Blade::directive('chatbot', function (string $expression): string {
+            $arg = trim($expression) === '' ? "'default'" : $expression;
+
+            return '<?php echo \\'.ChatbotFacade::class."::channel({$arg})->renderWidget(); ?>";
+        });
+    }
+}
