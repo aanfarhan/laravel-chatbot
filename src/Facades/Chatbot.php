@@ -10,8 +10,11 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static ChatbotManager context(array<string, mixed> $context)
+ * @method static ChatbotManager tools(list<string> $tools)
  * @method static FakeClient fake()
  * @method static string renderWidget(string $channel = 'default')
+ * @method static void registerTool(string $class)
+ * @method static void clearTools()
  *
  * @see ChatbotManager
  */

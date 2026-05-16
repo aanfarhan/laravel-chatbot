@@ -64,6 +64,11 @@ export class SSEClient extends EventTarget {
       case 'context_summary':
         this.dispatchEvent(new CustomEvent('context_summary', { detail: { text: payload.text } }))
         break
+      case 'tool_started':
+      case 'tool_finished':
+      case 'tool_failed':
+        this.dispatchEvent(new CustomEvent(payload.type, { detail: { name: payload.name, phase: payload.phase } }))
+        break
     }
   }
 }

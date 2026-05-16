@@ -9,13 +9,13 @@ use Aanfarhan\Chatbot\Responses\ChatResponse;
 interface LLMClient
 {
     /**
-     * @param  list<array{role: string, content: string}>  $messages
+     * @param  list<array<string, mixed>>  $messages
      * @param  list<array<string, mixed>>  $tools
      */
     public function chat(array $messages, array $tools = [], ?string $model = null): ChatResponse;
 
     /**
-     * @param  list<array{role: string, content: string}>  $messages
+     * @param  list<array<string, mixed>>  $messages
      * @param  list<array<string, mixed>>  $tools
      * @return iterable<int, mixed>
      */

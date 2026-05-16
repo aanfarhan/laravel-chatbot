@@ -4,23 +4,31 @@ declare(strict_types=1);
 
 namespace Aanfarhan\Chatbot\Streaming;
 
+use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
+use Aanfarhan\Chatbot\Contracts\PersistableTool;
+use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Events\ChatbotMessageCompleted;
 use Aanfarhan\Chatbot\Events\ChatbotMessageFailed;
 use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
+use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Support\Carbon;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class StreamCoordinator
 {
     private const CACHE_COUNTER_KEY = 'chatbot.active_streams';
+
+    private const RESULT_SIZE_CAP = 4096;
 
     public function __construct(
         private readonly LLMClient $llm,
@@ -29,10 +37,13 @@ final class StreamCoordinator
         private readonly ?CacheRepository $cache = null,
         private readonly ?Dispatcher $events = null,
         private readonly ?LoggerInterface $logger = null,
+        private readonly ?ToolRegistry $toolRegistry = null,
+        private readonly ?ToolInvocationStore $toolInvocationStore = null,
     ) {}
 
     /**
-     * @param  list<array{role: string, content: string}>  $messages
+     * @param  list<array<string, mixed>>  $messages
+     * @param  list<string>|null  $allowedTools  null means use full registry (legacy path); [] means no tools
      */
     public function handle(
         array $messages,
@@ -44,6 +55,7 @@ final class StreamCoordinator
         ?callable $preflight = null,
         ?string $contextSummary = null,
         string $channel = 'default',
+        ?array $allowedTools = null,
     ): StreamedResponse {
         $isAborted ??= static fn (): bool => (bool) connection_aborted();
         $rawDuration = $this->config->get('chatbot.stream_duration', 60);
@@ -60,6 +72,7 @@ final class StreamCoordinator
             $preflight,
             $contextSummary,
             $channel,
+            $allowedTools,
         ): void {
             $this->incrementCounter();
             $startedAt = microtime(true);
@@ -88,24 +101,85 @@ final class StreamCoordinator
                     $this->emit('context_summary', ['summary' => $contextSummary]);
                 }
 
-                foreach ($this->llm->stream($messages, model: $model) as $chunk) {
-                    if ($isAborted()) {
-                        $aborted = true;
+                $toolDefs = $this->resolveToolDefs($allowedTools);
+                $loopMessages = $messages;
+                $callsThisTurn = 0;
+                $maxCalls = $toolDefs !== [] ? $this->maxCallsPerTurn() : PHP_INT_MAX;
+
+                while (true) {
+                    $iterToolCalls = [];
+                    $iterText = '';
+
+                    foreach ($this->llm->stream($loopMessages, tools: $toolDefs, model: $model) as $chunk) {
+                        if ($isAborted()) {
+                            $aborted = true;
+                            break 2;
+                        }
+
+                        if ((microtime(true) - $startedAt) >= $streamDuration) {
+                            throw new ChatbotTimeoutException('stream duration exceeded');
+                        }
+
+                        /** @var StreamChunk $chunk */
+                        if ($chunk->toolCalls !== []) {
+                            foreach ($chunk->toolCalls as $tc) {
+                                $iterToolCalls[] = $tc;
+                            }
+                        }
+
+                        if ($chunk->content !== '') {
+                            $iterText .= $chunk->content;
+                            $assembled .= $chunk->content;
+                            $this->emit('token', ['content' => $chunk->content]);
+                        }
+
+                        if ($chunk->usage !== null) {
+                            $usage = $chunk->usage;
+                        }
+                    }
+
+                    if ($iterToolCalls === []) {
                         break;
                     }
 
-                    if ((microtime(true) - $startedAt) >= $streamDuration) {
-                        throw new ChatbotTimeoutException('stream duration exceeded');
+                    // Build assistant message carrying the tool_calls
+                    $assistantMsg = ['role' => 'assistant', 'content' => $iterText !== '' ? $iterText : null];
+                    $assistantMsg['tool_calls'] = array_map(
+                        fn (array $tc): array => [
+                            'id' => $tc['id'],
+                            'type' => 'function',
+                            'function' => ['name' => $tc['name'], 'arguments' => $tc['arguments']],
+                        ],
+                        $iterToolCalls,
+                    );
+                    $loopMessages[] = $assistantMsg;
+
+                    foreach ($iterToolCalls as $tc) {
+                        if ($callsThisTurn >= $maxCalls) {
+                            $loopMessages[] = [
+                                'role' => 'tool',
+                                'tool_call_id' => $tc['id'],
+                                'name' => $tc['name'],
+                                'content' => '[budget exhausted — tool call limit reached for this turn]',
+                            ];
+
+                            continue;
+                        }
+
+                        $loopMessages[] = $this->invokeToolCall(
+                            name: $tc['name'],
+                            argumentsJson: $tc['arguments'],
+                            callId: $tc['id'],
+                            channel: $channel,
+                            conversationId: $conversationId,
+                            allowedTools: $allowedTools,
+                        );
+                        $callsThisTurn++;
                     }
 
-                    /** @var StreamChunk $chunk */
-                    $assembled .= $chunk->content;
-
-                    if ($chunk->usage !== null) {
-                        $usage = $chunk->usage;
+                    if ($callsThisTurn >= $maxCalls) {
+                        $toolDefs = [];
                     }
-
-                    $this->emit('token', ['content' => $chunk->content]);
                 }
             } catch (ChatbotException $e) {
                 $chatbotException = $e;
@@ -178,6 +252,146 @@ final class StreamCoordinator
     }
 
     /**
+     * @param  list<string>|null  $allowedTools
+     * @return list<array<string, mixed>>
+     */
+    private function resolveToolDefs(?array $allowedTools): array
+    {
+        $supportsTools = $this->config->get('chatbot.provider.supports_tools', true);
+        if ($supportsTools === false) {
+            return [];
+        }
+
+        if ($this->toolRegistry === null) {
+            return [];
+        }
+
+        if ($allowedTools === null) {
+            return $this->toolRegistry->toDefinitions();
+        }
+
+        return $this->toolRegistry->toDefinitionsFor($allowedTools);
+    }
+
+    private function maxCallsPerTurn(): int
+    {
+        $raw = $this->config->get('chatbot.tools.max_calls_per_turn', 5);
+
+        return is_int($raw) ? $raw : 5;
+    }
+
+    private function defaultTimeout(): int
+    {
+        $raw = $this->config->get('chatbot.tools.default_timeout', 10);
+
+        return is_int($raw) ? $raw : 10;
+    }
+
+    /**
+     * @param  list<string>|null  $allowedTools
+     * @return array{role: string, tool_call_id: string, name: string, content: string}
+     */
+    private function invokeToolCall(string $name, string $argumentsJson, string $callId, string $channel, int $conversationId, ?array $allowedTools = null): array
+    {
+        if ($allowedTools !== null && ! in_array($name, $allowedTools, true)) {
+            return [
+                'role' => 'tool',
+                'tool_call_id' => $callId,
+                'name' => $name,
+                'content' => "[error: tool '{$name}' is not permitted on this channel]",
+            ];
+        }
+
+        $tool = $this->toolRegistry?->resolve($name);
+
+        if ($tool === null) {
+            return [
+                'role' => 'tool',
+                'tool_call_id' => $callId,
+                'name' => $name,
+                'content' => "[error: tool '{$name}' not found in registry]",
+            ];
+        }
+
+        $decoded = json_decode($argumentsJson, true);
+        /** @var array<string, mixed> $args */
+        $args = is_array($decoded) ? $decoded : [];
+
+        $invocation = new ToolInvocation(
+            args: $args,
+            actor: null,
+            channel: $channel,
+            context: [],
+        );
+
+        $this->emit('tool_started', ['name' => $name, 'phase' => 'started']);
+
+        $startedAt = now();
+
+        try {
+            if (! $tool->authorize($invocation)) {
+                $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+
+                $errorMsg = "[error: not authorized to call tool '{$name}']";
+                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'failed', 'not authorized', $startedAt);
+
+                return [
+                    'role' => 'tool',
+                    'tool_call_id' => $callId,
+                    'name' => $name,
+                    'content' => $errorMsg,
+                ];
+            }
+
+            $deadline = microtime(true) + $this->defaultTimeout();
+            $result = $tool->handle($invocation);
+
+            if (microtime(true) > $deadline) {
+                $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+
+                $errorMsg = "[error: tool '{$name}' timed out]";
+                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'failed', 'timed out', $startedAt);
+
+                return [
+                    'role' => 'tool',
+                    'tool_call_id' => $callId,
+                    'name' => $name,
+                    'content' => $errorMsg,
+                ];
+            }
+
+            $encoded = is_array($result) ? json_encode($result, JSON_THROW_ON_ERROR) : (string) $result;
+
+            if (strlen($encoded) > self::RESULT_SIZE_CAP) {
+                $encoded = substr($encoded, 0, self::RESULT_SIZE_CAP).'[truncated]';
+            }
+
+            $this->emit('tool_finished', ['name' => $name, 'phase' => 'finished']);
+
+            $this->persistToolSuccess($tool, $invocation, $conversationId, $name, $args, $result, $encoded, $startedAt);
+
+            return [
+                'role' => 'tool',
+                'tool_call_id' => $callId,
+                'name' => $name,
+                'content' => $encoded,
+            ];
+        } catch (\Throwable $e) {
+            $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+
+            $errorMsg = "[error: tool '{$name}' threw an exception: {$e->getMessage()}]";
+            $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'failed', $e->getMessage(), $startedAt);
+
+            return [
+                'role' => 'tool',
+                'tool_call_id' => $callId,
+                'name' => $name,
+                'content' => $errorMsg,
+            ];
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     private function emit(string $event, array $data): void
@@ -202,5 +416,71 @@ final class StreamCoordinator
             $this->cache?->decrement(self::CACHE_COUNTER_KEY);
         } catch (\Throwable) {
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @param  array<string, mixed>|string  $rawResult
+     */
+    private function persistToolSuccess(
+        ChatbotTool $tool,
+        ToolInvocation $invocation,
+        int $conversationId,
+        string $name,
+        array $args,
+        array|string $rawResult,
+        string $encodedResult,
+        Carbon $startedAt,
+    ): void {
+        if ($this->toolInvocationStore === null) {
+            return;
+        }
+
+        if ($tool instanceof PersistableTool) {
+            $payload = $tool->persist($invocation, $rawResult);
+            if ($payload === null) {
+                return;
+            }
+            $storedResult = json_encode($payload, JSON_THROW_ON_ERROR);
+        } else {
+            $storedResult = $encodedResult;
+        }
+
+        $this->toolInvocationStore->record(
+            conversationId: $conversationId,
+            messageId: null,
+            toolName: $name,
+            arguments: $args,
+            result: $storedResult,
+            status: 'ok',
+            error: null,
+            startedAt: $startedAt,
+            finishedAt: now(),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     */
+    private function persistInvocation(
+        int $conversationId,
+        string $name,
+        array $args,
+        string $result,
+        string $status,
+        ?string $error,
+        Carbon $startedAt,
+    ): void {
+        $this->toolInvocationStore?->record(
+            conversationId: $conversationId,
+            messageId: null,
+            toolName: $name,
+            arguments: $args,
+            result: $result,
+            status: $status,
+            error: $error,
+            startedAt: $startedAt,
+            finishedAt: now(),
+        );
     }
 }

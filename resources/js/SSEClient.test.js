@@ -89,6 +89,48 @@ describe('SSEClient', () => {
     expect(chunks).toEqual([{ text: 'after bad' }])
   })
 
+  it('emits a tool_started event', async () => {
+    const stream = makeStream(
+      'data: {"type":"tool_started","name":"lookup_order","phase":"started"}',
+      '',
+    )
+    const client = new SSEClient(makeFetch(stream))
+    const events = []
+    client.addEventListener('tool_started', (e) => events.push(e.detail))
+
+    await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
+
+    expect(events).toEqual([{ name: 'lookup_order', phase: 'started' }])
+  })
+
+  it('emits a tool_finished event', async () => {
+    const stream = makeStream(
+      'data: {"type":"tool_finished","name":"lookup_order","phase":"finished"}',
+      '',
+    )
+    const client = new SSEClient(makeFetch(stream))
+    const events = []
+    client.addEventListener('tool_finished', (e) => events.push(e.detail))
+
+    await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
+
+    expect(events).toEqual([{ name: 'lookup_order', phase: 'finished' }])
+  })
+
+  it('emits a tool_failed event', async () => {
+    const stream = makeStream(
+      'data: {"type":"tool_failed","name":"lookup_order","phase":"failed"}',
+      '',
+    )
+    const client = new SSEClient(makeFetch(stream))
+    const events = []
+    client.addEventListener('tool_failed', (e) => events.push(e.detail))
+
+    await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
+
+    expect(events).toEqual([{ name: 'lookup_order', phase: 'failed' }])
+  })
+
   it('abort stops processing mid-stream', async () => {
     // Both lines arrive in one read; abort() inside the chunk listener
     // stops the second line from being processed.

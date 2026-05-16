@@ -8,9 +8,12 @@ use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Clients\OpenAiCompatibleClient;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
+use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
 use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
+use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
+use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
@@ -24,6 +27,8 @@ final class ChatbotServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/chatbot.php', 'chatbot');
 
         $this->app->singleton(Chatbot::class, fn (Application $app): Chatbot => new Chatbot($app));
+
+        $this->app->singleton(ToolRegistry::class, fn (Application $app): ToolRegistry => new ToolRegistry($app));
 
         $this->app->singleton(
             ContextEnvelope::class,
@@ -48,6 +53,8 @@ final class ChatbotServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(ConversationStore::class, fn (): EloquentConversationStore => new EloquentConversationStore);
+
+        $this->app->singleton(ToolInvocationStore::class, fn (): EloquentToolInvocationStore => new EloquentToolInvocationStore);
 
         $this->app->singleton(LLMClient::class, function (Application $app): LLMClient {
             /** @var Repository $config */

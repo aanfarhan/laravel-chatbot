@@ -75,6 +75,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Provider capabilities
+    |--------------------------------------------------------------------------
+    | supports_tools: set to false for providers (e.g. Ollama, some self-hosted
+    |   setups) that do not implement the OpenAI tool-call protocol. When false,
+    |   the tool registry is not consulted, no `tools` field is sent to the
+    |   provider, and tool_calls parsing is skipped. The runtime fallback in
+    |   OpenAiCompatibleClient also detects a 400 tools-rejection and retries
+    |   once without tools, but hosts are expected to set this flag explicitly.
+    */
+    'provider' => [
+        'supports_tools' => (bool) env('CHATBOT_PROVIDER_SUPPORTS_TOOLS', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tool-calling
+    |--------------------------------------------------------------------------
+    | max_calls_per_turn: total tool invocations allowed across all loop
+    |   iterations for a single user message. Hitting the cap injects a
+    |   synthetic budget-exhausted tool result so the model still produces prose.
+    | default_timeout: per-tool wall-clock timeout in seconds. Individual tools
+    |   may override via ChatbotTool::timeout() once that method is added.
+    */
+    'tools' => [
+        'max_calls_per_turn' => (int) env('CHATBOT_TOOLS_MAX_CALLS_PER_TURN', 5),
+        'default_timeout' => (int) env('CHATBOT_TOOLS_DEFAULT_TIMEOUT', 10),
+        'replay_freshness' => (int) env('CHATBOT_TOOLS_REPLAY_FRESHNESS', 300),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Context sanitizer forbidden tags
     |--------------------------------------------------------------------------
     | Tag names (without angle brackets) whose open/close forms will be

@@ -35,6 +35,7 @@ function lifecycleConfig(int $duration = 60): ConfigRepository
     $config = Mockery::mock(ConfigRepository::class);
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn($duration);
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('gpt-4o-mini');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
 
     return $config;
 }

@@ -100,6 +100,7 @@ The widget exposes named parts targetable with `::part(...)` from your app's sty
 | `message-assistant` | Individual assistant message bubble |
 | `input` | Text input field |
 | `send-button` | Send button |
+| `tool-status` | Transient status chip shown during tool-call execution |
 
 **Example — custom launcher icon size:**
 
@@ -181,11 +182,11 @@ Channel defaults live in `config/chatbot.php`:
 
 - `Chatbot` facade method signatures (`context`, `prompt`, `greeting`, `summary`, `channel`, `fake`, `quota`, `authorize`)
 - Config keys in `chatbot.php`
-- SSE event shape: `{type, ...}` with documented fields for `token`, `done`, `error`, `context_summary`
+- SSE event shape: `{type, ...}` with documented fields for `token`, `done`, `error`, `context_summary`, `tool_started`, `tool_finished`, `tool_failed`
 - Signed envelope shape (public payload fields)
 - Web component attributes: `channel`, `position`, `title`
 - CSS custom properties: all eight `--chatbot-*` properties listed above
-- CSS parts: all eight named parts listed above
+- CSS parts: all nine named parts listed above
 - Event class names: `ChatbotMessageStarted`, `ChatbotMessageCompleted`, `ChatbotMessageFailed`, `ChatbotSuspiciousContextDetected`
 - Typed exception class hierarchy under `ChatbotException`
 

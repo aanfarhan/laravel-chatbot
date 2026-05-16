@@ -12,6 +12,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
+use Psr\Log\LoggerInterface;
 
 function buildOpenAiClient(MockHandler $mock, array &$history): OpenAiCompatibleClient
 {
@@ -87,4 +88,65 @@ it('throws ChatbotProviderException with retryable=true on HTTP 429', function (
         expect($e->isRetryable())->toBeTrue();
         expect($e->code())->toBe('provider_error');
     }
+});
+
+// --- Runtime fallback: 400 tools-unsupported retries once without tools ---
+
+it('retries once without tools when provider returns 400 with a tools-related error body', function (): void {
+    $successSse = implode('', [
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"},\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: [DONE]\n\n",
+    ]);
+
+    $mock = new MockHandler([
+        new Response(400, [], '{"error":{"message":"This model does not support tool calls"}}'),
+        new Response(200, ['Content-Type' => 'text/event-stream'], $successSse),
+    ]);
+
+    $history = [];
+    $stack = HandlerStack::create($mock);
+    $stack->push(Middleware::history($history));
+    $guzzle = new GuzzleClient(['handler' => $stack]);
+
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('warning')->once()->withArgs(fn (string $msg) => str_contains($msg, 'tools'));
+
+    $client = new OpenAiCompatibleClient(
+        $guzzle,
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'sk-test',
+        model: 'gpt-4o-mini',
+        logger: $logger,
+    );
+
+    $tools = [['type' => 'function', 'function' => ['name' => 'lookup_order']]];
+    $chunks = iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']], $tools));
+
+    // Exactly two HTTP calls: one with tools (failed), one without (succeeded)
+    expect($history)->toHaveCount(2);
+
+    $firstPayload = json_decode((string) $history[0]['request']->getBody(), true);
+    expect($firstPayload)->toHaveKey('tools');
+
+    $secondPayload = json_decode((string) $history[1]['request']->getBody(), true);
+    expect($secondPayload)->not->toHaveKey('tools');
+
+    // Stream still yields content from the retry
+    $content = implode('', array_map(fn ($c) => $c->content, $chunks));
+    expect($content)->toBe('Hi');
+});
+
+it('does not retry when 400 error body is not tools-related', function (): void {
+    $mock = new MockHandler([
+        new Response(400, [], '{"error":{"message":"Bad request: invalid JSON"}}'),
+    ]);
+    $history = [];
+    $client = buildOpenAiClient($mock, $history);
+
+    $tools = [['type' => 'function', 'function' => ['name' => 'lookup_order']]];
+
+    expect(fn () => iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']], $tools)))
+        ->toThrow(ChatbotProviderException::class);
+
+    expect($history)->toHaveCount(1);
 });

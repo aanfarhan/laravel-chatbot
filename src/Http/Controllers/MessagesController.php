@@ -14,6 +14,7 @@ use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
 use Aanfarhan\Chatbot\PromptAssembler;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
+use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -102,7 +103,7 @@ final class MessagesController
             contextHash: $contextHash,
         );
 
-        $coordinator = new StreamCoordinator($this->llm, $this->store, $this->config, events: $this->events, logger: $this->logger);
+        $coordinator = new StreamCoordinator($this->llm, $this->store, $this->config, events: $this->events, logger: $this->logger, toolRegistry: app(ToolRegistry::class));
 
         $quotaPreflight = function () use ($request): void {
             $quota = $this->chatbot->resolveQuota($request);
@@ -123,6 +124,7 @@ final class MessagesController
             preflight: $quotaPreflight,
             contextSummary: $verified->summary,
             channel: $verified->channel,
+            allowedTools: $verified->allowedTools,
         );
 
         $streamed->headers->set('Content-Type', 'text/event-stream; charset=UTF-8');

@@ -102,6 +102,15 @@ const css = `
   padding: 2px 0 4px;
   align-self: flex-start;
 }
+.tool-status {
+  font-size: 12px;
+  color: #374151;
+  background: #e5e7eb;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  align-self: flex-start;
+  max-width: fit-content;
+}
 .message-actions {
   display: flex;
   gap: 4px;
@@ -189,6 +198,7 @@ class ChatbotWidget extends HTMLElement {
   #lastUserMessage = null
   #lastAssistantBubble = null
   #contextSummary = null
+  #toolStatusEl = null
 
   constructor() {
     super()
@@ -203,6 +213,9 @@ class ChatbotWidget extends HTMLElement {
     this.#render()
     this.#restoreState()
     this.#loadGreeting()
+    this.addEventListener('tool_started', (e) => this.#showToolStatus(e.detail.name))
+    this.addEventListener('tool_finished', () => this.#hideToolStatus())
+    this.addEventListener('tool_failed', () => this.#hideToolStatus())
   }
 
   attributeChangedCallback() {
@@ -249,6 +262,13 @@ class ChatbotWidget extends HTMLElement {
     messages.className = 'messages'
     messages.part = 'messages'
     panel.appendChild(messages)
+
+    const toolStatus = document.createElement('div')
+    toolStatus.className = 'tool-status'
+    toolStatus.setAttribute('part', 'tool-status')
+    toolStatus.hidden = true
+    panel.appendChild(toolStatus)
+    this.#toolStatusEl = toolStatus
 
     const inputRow = document.createElement('div')
     inputRow.className = 'input-row'
@@ -351,6 +371,9 @@ class ChatbotWidget extends HTMLElement {
       this.#addMessageActions(bubble)
       this.#finishStreaming()
     })
+    client.addEventListener('tool_started', (e) => this.dispatchEvent(new CustomEvent('tool_started', { detail: e.detail })))
+    client.addEventListener('tool_finished', (e) => this.dispatchEvent(new CustomEvent('tool_finished', { detail: e.detail })))
+    client.addEventListener('tool_failed', (e) => this.dispatchEvent(new CustomEvent('tool_failed', { detail: e.detail })))
     client.addEventListener('error', (e) => {
       this.#handleStreamError(e.detail, bubble, text, envelope, conversationId)
       this.#finishStreaming()
@@ -486,8 +509,20 @@ class ChatbotWidget extends HTMLElement {
     errEl.scrollIntoView({ behavior: 'smooth' })
   }
 
+  #showToolStatus(name) {
+    if (!this.#toolStatusEl) return
+    this.#toolStatusEl.textContent = `Working: ${name}…`
+    this.#toolStatusEl.hidden = false
+  }
+
+  #hideToolStatus() {
+    if (!this.#toolStatusEl) return
+    this.#toolStatusEl.hidden = true
+  }
+
   #finishStreaming() {
     this.#streaming = false
+    this.#hideToolStatus()
     const btn = this.#sendBtn()
     if (btn) btn.disabled = false
   }

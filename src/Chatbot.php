@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot;
 
 use Aanfarhan\Chatbot\Clients\FakeClient;
+use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
+use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use DateTimeImmutable;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Contracts\Config\Repository;
@@ -26,6 +28,9 @@ final class Chatbot
 
     /** @var array<string, callable|string> */
     private array $channelSummaries = [];
+
+    /** @var array<string, list<string>> */
+    private array $channelAllowlists = [];
 
     /** @var callable|null */
     private $authorizeResolver = null;
@@ -76,6 +81,16 @@ final class Chatbot
         return $this;
     }
 
+    /**
+     * @param  list<string>  $tools
+     */
+    public function tools(array $tools): self
+    {
+        $this->channelAllowlists['default'] = $tools;
+
+        return $this;
+    }
+
     public function channel(string $name): ChannelScope
     {
         return new ChannelScope($this, $name);
@@ -109,6 +124,24 @@ final class Chatbot
     public function setChannelSummary(string $channel, callable|string $summary): void
     {
         $this->channelSummaries[$channel] = $summary;
+    }
+
+    /**
+     * @param  list<string>  $tools
+     *
+     * @internal
+     */
+    public function setChannelAllowlist(string $channel, array $tools): void
+    {
+        $this->channelAllowlists[$channel] = $tools;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function resolveChannelAllowlist(string $channel): array
+    {
+        return $this->channelAllowlists[$channel] ?? [];
     }
 
     public function resolveChannelPrompt(string $channel): ?string
@@ -206,6 +239,19 @@ final class Chatbot
         return ['allow' => (bool) $result, 'reason' => ''];
     }
 
+    /**
+     * @param  class-string<ChatbotTool>  $class
+     */
+    public function registerTool(string $class): void
+    {
+        $this->app->make(ToolRegistry::class)->register($class);
+    }
+
+    public function clearTools(): void
+    {
+        $this->app->make(ToolRegistry::class)->clear();
+    }
+
     public function fake(): FakeClient
     {
         $fake = new FakeClient;
@@ -248,6 +294,7 @@ final class Chatbot
             greeting: $this->resolveChannelGreeting($channel),
             prompt: $this->resolveChannelPrompt($channel),
             summary: $this->resolveChannelSummary($channel),
+            allowedTools: $this->resolveChannelAllowlist($channel),
         );
 
         return sprintf(

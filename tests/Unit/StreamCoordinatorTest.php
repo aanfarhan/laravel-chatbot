@@ -61,6 +61,7 @@ it('emits error event and stops when stream-duration cap is exceeded', function 
     $config = Mockery::mock(ConfigRepository::class);
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(0); // instant cap
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
 
     $coordinator = new StreamCoordinator($client, $store, $config);
 
@@ -91,6 +92,7 @@ it('tears down the upstream stream and decrements counter on client abort', func
     $config = Mockery::mock(ConfigRepository::class);
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
 
     $cache = Mockery::mock(Repository::class);
     $cache->shouldReceive('increment')->once();
@@ -124,6 +126,7 @@ it('increments the active-stream counter on start and decrements on success', fu
     $config = Mockery::mock(ConfigRepository::class);
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
 
     $cache = Mockery::mock(Repository::class);
     $cache->shouldReceive('increment')->with('chatbot.active_streams')->once();
@@ -152,6 +155,7 @@ it('emits token events then done for a three-chunk stream', function (): void {
     $config = Mockery::mock(ConfigRepository::class);
     $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
     $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
 
     $coordinator = new StreamCoordinator($client, $store, $config);
 

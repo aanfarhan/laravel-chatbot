@@ -42,6 +42,16 @@ final class ChannelScope
         return $this;
     }
 
+    /**
+     * @param  list<string>  $tools
+     */
+    public function tools(array $tools): self
+    {
+        $this->chatbot->setChannelAllowlist($this->channel, $tools);
+
+        return $this;
+    }
+
     public function renderWidget(): string
     {
         return $this->chatbot->renderWidgetForChannel($this->channel);

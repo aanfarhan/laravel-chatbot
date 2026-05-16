@@ -6,6 +6,10 @@ Use `/Users/farhan/Library/Application Support/Herd/bin/php83` to run PHP comman
 
 After every PHP file change or new PHP file creation, run `vendor/bin/pint` to auto-fix formatting. Do not skip this — the CI runs `vendor/bin/pint --test` and will fail if formatting is off.
 
+## Static analysis
+
+After every PHP file change or new PHP file creation, run `vendor/bin/phpstan analyse --memory-limit=512M` to check for type errors. Do not skip this — the CI runs PHPStan at level 9 and will fail if there are errors.
+
 ## Agent skills
 
 ### Issue tracker
