@@ -8,6 +8,7 @@ use Aanfarhan\Chatbot\Chatbot;
 use Aanfarhan\Chatbot\ContextSanitizer;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
+use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
 use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
@@ -37,6 +38,7 @@ final class MessagesController
         private readonly Dispatcher $events,
         private readonly Chatbot $chatbot,
         private readonly RateLimiter $rateLimiter,
+        private readonly ToolInvocationStore $toolInvocationStore,
         private readonly ?LoggerInterface $logger = null,
     ) {}
 
@@ -103,7 +105,7 @@ final class MessagesController
             contextHash: $contextHash,
         );
 
-        $coordinator = new StreamCoordinator($this->llm, $this->store, $this->config, events: $this->events, logger: $this->logger, toolRegistry: app(ToolRegistry::class));
+        $coordinator = new StreamCoordinator($this->llm, $this->store, $this->config, events: $this->events, logger: $this->logger, toolRegistry: app(ToolRegistry::class), toolInvocationStore: $this->toolInvocationStore);
 
         $quotaPreflight = function () use ($request): void {
             $quota = $this->chatbot->resolveQuota($request);
