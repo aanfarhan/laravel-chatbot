@@ -125,7 +125,7 @@ final class MessagesController
             channel: $verified->channel,
         );
 
-        $streamed->headers->set('Content-Type', 'text/event-stream');
+        $streamed->headers->set('Content-Type', 'text/event-stream; charset=UTF-8');
         $streamed->headers->set('Cache-Control', 'no-cache');
         $streamed->headers->set('X-Accel-Buffering', 'no');
         $streamed->headers->setCookie(cookie($cookieName, (string) $conversation->id, $minuteTtl, '/chatbot'));
