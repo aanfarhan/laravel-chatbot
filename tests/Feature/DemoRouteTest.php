@@ -49,7 +49,7 @@ it('sends a streamed canned reply when a message is posted in demo mode', functi
     ]);
 
     $response->assertStatus(200)
-        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        ->assertHeader('Content-Type', 'text/event-stream; charset=UTF-8');
 
     ob_start();
     $response->baseResponse->sendContent();
