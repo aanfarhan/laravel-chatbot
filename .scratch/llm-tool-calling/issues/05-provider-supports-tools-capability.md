@@ -1,6 +1,6 @@
 # Provider `supports_tools` capability flag + runtime fallback
 
-Status: ready-for-agent
+Status: done
 
 ## What to build
 
@@ -12,13 +12,13 @@ Make tool support explicit per host deployment so the package degrades cleanly a
 
 ## Acceptance criteria
 
-- [ ] `chatbot.provider.supports_tools` config key documented in README provider section, default `true`
-- [ ] When flag is `false`: no `tools` sent to provider, no `tool_calls` parsing attempted, allowlist effectively empty
-- [ ] When flag is `true` and provider rejects with a tools-related error: client retries once without `tools`, logs a warning
-- [ ] After a runtime fallback, the conversation completes normally (no tool-call loop, model answers from static context only)
-- [ ] Unit test: flag-off path skips registry and envelope tool encoding
-- [ ] Unit test: simulated "tools unsupported" response from provider triggers exactly one retry without tools
-- [ ] `vendor/bin/pint` clean, PHPStan level 9 clean
+- [x] `chatbot.provider.supports_tools` config key documented in README provider section, default `true`
+- [x] When flag is `false`: no `tools` sent to provider, no `tool_calls` parsing attempted, allowlist effectively empty
+- [x] When flag is `true` and provider rejects with a tools-related error: client retries once without `tools`, logs a warning
+- [x] After a runtime fallback, the conversation completes normally (no tool-call loop, model answers from static context only)
+- [x] Unit test: flag-off path skips registry and envelope tool encoding
+- [x] Unit test: simulated "tools unsupported" response from provider triggers exactly one retry without tools
+- [x] `vendor/bin/pint` clean, PHPStan level 9 clean
 
 ## Blocked by
 
