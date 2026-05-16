@@ -28,7 +28,8 @@ final class DeleteUserCommand extends Command
             $query->where('channel', $channel);
         }
 
-        $count = $hard ? $query->forceDelete() : $query->delete();
+        $result = $hard ? $query->forceDelete() : $query->delete();
+        $count = is_int($result) ? $result : 0;
 
         $action = $hard ? 'Hard-deleted' : 'Soft-deleted';
         $this->info("{$action} {$count} conversation(s) for user {$userId}.");

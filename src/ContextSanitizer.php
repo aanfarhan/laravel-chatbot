@@ -34,7 +34,11 @@ final class ContextSanitizer
     public function sanitize(array $context): array
     {
         $keyPaths = [];
-        $result = $this->walk($context, '', $keyPaths);
+        $result = [];
+
+        foreach ($context as $k => $v) {
+            $result[$k] = $this->walk($v, (string) $k, $keyPaths);
+        }
 
         if ($keyPaths !== []) {
             Event::dispatch(new ChatbotSuspiciousContextDetected($keyPaths, $result));

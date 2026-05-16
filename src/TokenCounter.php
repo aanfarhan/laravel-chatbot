@@ -39,6 +39,11 @@ final class TokenCounter
 
         // Last element is always the current user message; everything before is history.
         $current = array_pop($rest);
+
+        if ($current === null) {
+            return array_values($system);
+        }
+
         $history = $rest; // alternating assistant/user pairs
 
         while ($history !== [] && $this->count([...$system, ...$history, $current]) > $cap) {

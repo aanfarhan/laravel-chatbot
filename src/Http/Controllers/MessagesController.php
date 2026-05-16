@@ -61,11 +61,13 @@ final class MessagesController
             return $throttleResponse;
         }
 
-        $ttl = (int) $this->config->get('chatbot.conversation_ttl', 86400);
+        $rawTtl = $this->config->get('chatbot.conversation_ttl', 86400);
+        $ttl = is_int($rawTtl) ? $rawTtl : 86400;
 
         $guestToken = null;
         if ($verified->userId === null) {
-            $guestToken = $request->cookie('chatbot_guest_id') ?? Str::random(40);
+            $rawToken = $request->cookie('chatbot_guest_id');
+            $guestToken = is_string($rawToken) && $rawToken !== '' ? $rawToken : Str::random(40);
         }
 
         $conversation = $this->resolveConversation($request, $verified->channel, $ttl, $verified->userId, $guestToken);
@@ -126,7 +128,7 @@ final class MessagesController
         $streamed->headers->set('Content-Type', 'text/event-stream');
         $streamed->headers->set('Cache-Control', 'no-cache');
         $streamed->headers->set('X-Accel-Buffering', 'no');
-        $streamed->headers->setCookie(cookie($cookieName, $conversation->id, $minuteTtl, '/chatbot'));
+        $streamed->headers->setCookie(cookie($cookieName, (string) $conversation->id, $minuteTtl, '/chatbot'));
 
         if ($guestToken !== null) {
             $streamed->headers->setCookie(
@@ -142,13 +144,11 @@ final class MessagesController
         /** @var array<string, mixed> $channelThrottle */
         $channelThrottle = (array) $this->config->get("chatbot.channels.{$channel}.throttle", []);
 
-        $perMinute = isset($channelThrottle['per_minute'])
-            ? (int) $channelThrottle['per_minute']
-            : (int) $this->config->get('chatbot.throttle.per_minute', 20);
+        $rawPerMinute = $channelThrottle['per_minute'] ?? $this->config->get('chatbot.throttle.per_minute', 20);
+        $perMinute = is_int($rawPerMinute) ? $rawPerMinute : 20;
 
-        $perDay = isset($channelThrottle['per_day'])
-            ? (int) $channelThrottle['per_day']
-            : (int) $this->config->get('chatbot.throttle.per_day', 200);
+        $rawPerDay = $channelThrottle['per_day'] ?? $this->config->get('chatbot.throttle.per_day', 200);
+        $perDay = is_int($rawPerDay) ? $rawPerDay : 200;
 
         $ip = $request->ip() ?? 'unknown';
         $base = "chatbot:{$channel}:{$ip}";
@@ -181,7 +181,8 @@ final class MessagesController
         ?string $guestToken,
     ): ConversationRecord {
         $cookieName = 'chatbot_conversation_'.$channel;
-        $conversationId = (int) $request->cookie($cookieName, 0);
+        $rawId = $request->cookie($cookieName);
+        $conversationId = is_string($rawId) && is_numeric($rawId) ? (int) $rawId : 0;
 
         if ($conversationId > 0) {
             $existing = $this->store->find($conversationId);

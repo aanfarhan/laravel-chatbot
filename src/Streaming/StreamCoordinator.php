@@ -46,7 +46,8 @@ final class StreamCoordinator
         string $channel = 'default',
     ): StreamedResponse {
         $isAborted ??= static fn (): bool => (bool) connection_aborted();
-        $streamDuration = (int) $this->config->get('chatbot.stream_duration', 60);
+        $rawDuration = $this->config->get('chatbot.stream_duration', 60);
+        $streamDuration = is_int($rawDuration) ? $rawDuration : 60;
 
         return new StreamedResponse(function () use (
             $messages,
@@ -67,7 +68,8 @@ final class StreamCoordinator
             $aborted = false;
             $chatbotException = null;
 
-            $resolvedModel = $model ?? (string) $this->config->get('chatbot.model', '');
+            $rawModel = $this->config->get('chatbot.model', '');
+            $resolvedModel = $model ?? (is_string($rawModel) ? $rawModel : '');
 
             if ($this->events !== null) {
                 $this->events->dispatch(new ChatbotMessageStarted(
@@ -133,8 +135,8 @@ final class StreamCoordinator
                     content: $assembled,
                     routeName: $routeName,
                     contextHash: $contextHash,
-                    inputTokens: $usage?->inputTokens ?? 0,
-                    outputTokens: $usage?->outputTokens ?? 0,
+                    inputTokens: $usage !== null ? $usage->inputTokens : 0,
+                    outputTokens: $usage !== null ? $usage->outputTokens : 0,
                     error: $chatbotException !== null ? [
                         'code' => $chatbotException->code(),
                         'message' => $chatbotException->getMessage(),
@@ -146,8 +148,8 @@ final class StreamCoordinator
                     'channel' => $channel,
                     'model' => $resolvedModel,
                     'duration_ms' => $durationMs,
-                    'input_tokens' => $usage?->inputTokens ?? 0,
-                    'output_tokens' => $usage?->outputTokens ?? 0,
+                    'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
+                    'output_tokens' => $usage !== null ? $usage->outputTokens : 0,
                 ];
 
                 if ($chatbotException !== null) {
@@ -156,15 +158,15 @@ final class StreamCoordinator
                 } else {
                     $this->emit('done', [
                         'usage' => [
-                            'input_tokens' => $usage?->inputTokens ?? 0,
-                            'output_tokens' => $usage?->outputTokens ?? 0,
+                            'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
+                            'output_tokens' => $usage !== null ? $usage->outputTokens : 0,
                         ],
                     ]);
 
                     if ($this->events !== null) {
                         $this->events->dispatch(new ChatbotMessageCompleted(
-                            inputTokens: $usage?->inputTokens ?? 0,
-                            outputTokens: $usage?->outputTokens ?? 0,
+                            inputTokens: $usage !== null ? $usage->inputTokens : 0,
+                            outputTokens: $usage !== null ? $usage->outputTokens : 0,
                             model: $resolvedModel,
                         ));
                     }

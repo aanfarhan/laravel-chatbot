@@ -53,7 +53,7 @@ final class ExportUserCommand extends Command
             ])->all(),
         ];
 
-        $this->line(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $this->line(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
     /** @param Collection<int, Conversation> $conversations */

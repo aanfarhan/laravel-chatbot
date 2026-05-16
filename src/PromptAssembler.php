@@ -32,11 +32,11 @@ final class PromptAssembler
     ): array {
         $systemParts = [self::BASE_PROMPT];
 
-        if (isset($channelConfig['system_prompt']) && $channelConfig['system_prompt'] !== '') {
+        if (isset($channelConfig['system_prompt']) && is_string($channelConfig['system_prompt']) && $channelConfig['system_prompt'] !== '') {
             $systemParts[] = $channelConfig['system_prompt'];
         }
 
-        if (isset($routeOverrides['prompt']) && $routeOverrides['prompt'] !== '') {
+        if (isset($routeOverrides['prompt']) && is_string($routeOverrides['prompt']) && $routeOverrides['prompt'] !== '') {
             $systemParts[] = $routeOverrides['prompt'];
         }
 

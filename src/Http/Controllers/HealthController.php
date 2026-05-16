@@ -22,7 +22,8 @@ final class HealthController
         $activeStreams = 0;
 
         try {
-            $activeStreams = (int) ($this->cache?->get(self::CACHE_COUNTER_KEY, 0) ?? 0);
+            $raw = $this->cache?->get(self::CACHE_COUNTER_KEY) ?? 0;
+            $activeStreams = is_int($raw) ? $raw : 0;
         } catch (\Throwable) {
         }
 

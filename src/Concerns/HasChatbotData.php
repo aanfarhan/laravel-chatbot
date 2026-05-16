@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 trait HasChatbotData
 {
+    /** @return HasMany<Conversation, $this> */
     public function chatbotConversations(): HasMany
     {
         return $this->hasMany(Conversation::class, 'user_id');

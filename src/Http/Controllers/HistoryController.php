@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Aanfarhan\Chatbot\Http\Controllers;
 
-use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
 use Aanfarhan\Chatbot\Models\Conversation;
@@ -15,7 +14,6 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 final class HistoryController
 {
     public function __construct(
-        private readonly ConversationStore $store,
         private readonly ContextEnvelope $envelope,
     ) {}
 
@@ -42,10 +40,11 @@ final class HistoryController
         }
 
         $guestToken = $request->cookie('chatbot_guest_id');
-        $userId = $request->user()?->getAuthIdentifier();
+        $rawAuthId = $request->user()?->getAuthIdentifier();
+        $userId = is_int($rawAuthId) ? $rawAuthId : (is_string($rawAuthId) && is_numeric($rawAuthId) ? (int) $rawAuthId : null);
 
         $authorized = match (true) {
-            $conversation->user_id !== null => $userId !== null && (int) $userId === $conversation->user_id,
+            $conversation->user_id !== null => $userId !== null && $userId === $conversation->user_id,
             $conversation->guest_token !== null => $guestToken !== null && $guestToken === $conversation->guest_token,
             default => false,
         };

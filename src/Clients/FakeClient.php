@@ -47,6 +47,9 @@ final class FakeClient implements LLMClient
         return $this;
     }
 
+    /**
+     * @param  list<string>  $chunksBefore
+     */
     public function throwDuringStream(\Throwable $exception, array $chunksBefore = []): self
     {
         $this->streamException = $exception;

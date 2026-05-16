@@ -63,6 +63,11 @@ final class OpenAiCompatibleClient implements LLMClient
         return new ChatResponse($content, $usage);
     }
 
+    /**
+     * @param  list<array{role: string, content: string}>  $messages
+     * @param  list<array<string, mixed>>  $tools
+     * @return iterable<int, StreamChunk>
+     */
     public function stream(array $messages, array $tools = [], ?string $model = null): iterable
     {
         if ($this->apiKey === '') {
@@ -74,7 +79,7 @@ final class OpenAiCompatibleClient implements LLMClient
 
     /**
      * @param  list<array{role: string, content: string}>  $messages
-     * @return \Generator<StreamChunk>
+     * @return \Generator<int, StreamChunk, mixed, void>
      */
     private function doStream(array $messages, ?string $model): \Generator
     {
@@ -108,14 +113,15 @@ final class OpenAiCompatibleClient implements LLMClient
 
         $body = $response->getBody();
 
-        while (! $body->eof()) {
+        while (true) {
+            $char = $body->read(1);
+            if ($char === '') {
+                break;
+            }
             $line = '';
-            while (! $body->eof()) {
-                $char = $body->read(1);
-                if ($char === "\n") {
-                    break;
-                }
+            while ($char !== "\n" && $char !== '') {
                 $line .= $char;
+                $char = $body->read(1);
             }
 
             $line = trim($line);

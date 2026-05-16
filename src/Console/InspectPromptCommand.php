@@ -59,7 +59,7 @@ final class InspectPromptCommand extends Command
         );
 
         $header = "route={$route}  channel={$channel}";
-        if ($userId !== null) {
+        if ($userId !== null && is_string($userId)) {
             $header .= "  user={$userId}";
         }
 
@@ -95,6 +95,11 @@ final class InspectPromptCommand extends Command
             return null;
         }
 
-        return $decoded;
+        $result = [];
+        foreach ($decoded as $key => $value) {
+            $result[(string) $key] = $value;
+        }
+
+        return $result;
     }
 }

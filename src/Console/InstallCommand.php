@@ -62,9 +62,8 @@ final class InstallCommand extends Command
                 continue;
             }
 
-            $value = $this->input->isInteractive()
-                ? (string) ($this->ask($this->labelFor($key), $default) ?? $default)
-                : $default;
+            $asked = $this->input->isInteractive() ? $this->ask($this->labelFor($key), $default) : null;
+            $value = is_string($asked) ? $asked : $default;
 
             $appended .= "{$key}={$value}\n";
         }

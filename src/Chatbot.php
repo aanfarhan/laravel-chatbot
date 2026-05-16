@@ -151,7 +151,13 @@ final class Chatbot
             return null;
         }
 
-        return is_callable($raw) ? (string) $raw() : (string) $raw;
+        if (is_callable($raw)) {
+            $called = $raw();
+
+            return is_string($called) ? $called : '';
+        }
+
+        return is_string($raw) ? $raw : '';
     }
 
     public function authorize(callable $resolver): self
@@ -189,9 +195,11 @@ final class Chatbot
         $result = ($this->quotaResolver)($request);
 
         if (is_array($result)) {
+            $reason = $result['reason'] ?? '';
+
             return [
                 'allow' => (bool) ($result['allow'] ?? true),
-                'reason' => (string) ($result['reason'] ?? ''),
+                'reason' => is_string($reason) ? $reason : '',
             ];
         }
 

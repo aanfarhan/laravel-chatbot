@@ -2,26 +2,13 @@
 
 declare(strict_types=1);
 
-use Aanfarhan\Chatbot\Concerns\HasChatbotData;
 use Aanfarhan\Chatbot\Models\Conversation;
 use Aanfarhan\Chatbot\Models\Message;
-use Illuminate\Database\Eloquent\Model;
+use Aanfarhan\Chatbot\Tests\Stubs\FakeUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
-
-// Minimal host User model for Testbench
-class FakeUser extends Model
-{
-    use HasChatbotData;
-
-    protected $table = 'users';
-
-    protected $guarded = [];
-
-    public $timestamps = false;
-}
 
 beforeEach(function (): void {
     Schema::create('users', function ($table): void {

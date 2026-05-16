@@ -17,12 +17,14 @@ final class DeleteGuestCommand extends Command
 
     public function handle(): int
     {
-        $token = (string) $this->argument('token');
+        $rawToken = $this->argument('token');
+        $token = is_string($rawToken) ? $rawToken : '';
         $hard = (bool) $this->option('hard');
 
         $query = Conversation::where('guest_token', $token);
 
-        $count = $hard ? $query->forceDelete() : $query->delete();
+        $result = $hard ? $query->forceDelete() : $query->delete();
+        $count = is_int($result) ? $result : 0;
 
         $action = $hard ? 'Hard-deleted' : 'Soft-deleted';
         $this->info("{$action} {$count} conversation(s) for guest token {$token}.");
