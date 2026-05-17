@@ -7,7 +7,8 @@ This package mediates between a host Laravel application and a third-party LLM. 
 1. **Context forgery / replay** — a client that forges or replays a signed context envelope to impersonate another user or escalate privileges.
 2. **Prompt injection via context data** — user-controlled data reaching the system prompt as instructions rather than data.
 3. **Bot-output XSS** — the LLM returns content that the web component renders as HTML, enabling script injection.
-4. **Worker exhaustion** — an adversary sending messages that cause runaway LLM calls, consuming server threads and API budget.
+4. **Worker / budget exhaustion** — an adversary sending messages that cause runaway LLM calls, consuming server threads and API budget.
+5. **Tool-call abuse** — a model coerced into invoking registered tools repeatedly or recursively, fanning out cost and side effects.
 
 ---
 
@@ -15,10 +16,14 @@ This package mediates between a host Laravel application and a third-party LLM. 
 
 | Threat | Mitigation |
 |---|---|
-| Context forgery / replay | HMAC-signed `ContextEnvelope` with a configurable TTL (`chatbot.envelope_ttl`, default 900 s). An expired or tampered token is rejected with HTTP 403. |
+| Context forgery / replay | HMAC-SHA256 signed `ContextEnvelope` (key = `app.key`) with a configurable TTL (`chatbot.envelope_ttl`, default 900 s). Verify also binds user, route, channel, and version; tampered, expired, or mismatched tokens are rejected with HTTP 403 (`InvalidEnvelopeException`). |
 | Basic tag-shape injection | `ContextSanitizer` strips the tags configured in `chatbot.sanitizer_tags` (default: `context`, `system`, `instructions`, `assistant`, `user`) from context values before they enter the prompt. |
 | Bot-output XSS | The web component passes LLM output through a DOMPurify allowlist before inserting it into the DOM. Only a curated set of formatting tags is permitted. |
-| Worker exhaustion | Each SSE stream runs with an abort signal tied to the client disconnect. The `CHATBOT_TIMEOUT` environment variable caps wall-clock time per request. |
+| Per-IP flooding | `MessagesController` enforces a per-IP+channel throttle via Laravel's `RateLimiter`: `chatbot.throttle.per_minute` (default 20) and `chatbot.throttle.per_day` (default 200). Both are overrideable per channel. |
+| Worker exhaustion | Each SSE stream runs with an abort signal tied to the client disconnect (`connection_aborted()`). A wall-clock cap (`chatbot.stream_duration`, default 60 s) raises `ChatbotTimeoutException` if exceeded. Individual tool calls are bounded by `chatbot.tools.default_timeout` (default 10 s). |
+| Prompt-size blowup | `chatbot.token_cap` (default 32768) bounds assembled input tokens; oldest history turns are pruned first. A user message that alone exceeds the cap raises `ChatbotTokenCapExceededException`. |
+| API budget exhaustion | `DailyUsageTracker` enforces per-user/per-day token quotas (`chatbot.daily_quota.input` / `.output`, defaults 200k / 50k, UTC-reset). Exhaustion raises `ChatbotQuotaExceededException`, surfaced as an SSE `error` event. |
+| Tool-call abuse | `chatbot.tools.max_calls_per_turn` (default 5) caps total tool invocations per user message across all loop iterations; the cap injects a synthetic budget-exhausted tool result instead of looping. `chatbot.tools.replay_freshness` (default 300 s) re-uses recent tool results from `ToolInvocationStore` rather than re-invoking. |
 
 ---
 
@@ -30,7 +35,9 @@ This package mediates between a host Laravel application and a third-party LLM. 
 | Post-render content drift | The DOMPurify pass runs at insertion time; dynamic DOM mutations after render are outside the component's control. |
 | Base64-encoded or obfuscated payloads | The sanitizer operates on plaintext strings; it does not decode or classify encoded content. |
 | Two-pass content classification | No secondary classifier runs on LLM output to detect policy violations before display. |
-| Automatic retry / model fallback | If the LLM returns an error or an empty response, the package surfaces the failure; it does not retry or switch models. |
+| Automatic retry / model fallback | If the LLM returns an error or an empty response, the package surfaces the failure; it does not retry or switch models. (`OpenAiCompatibleClient` does retry once without `tools` on a 400 tools-rejection, but that is a compatibility fallback, not a general retry policy.) |
+| Outbound tool side effects | Registered tools run with the application's full privileges. The package caps call count and per-call wall-clock time, but does not sandbox arguments, network egress, or filesystem access — host-supplied tool implementations are trusted code. |
+| Demo-mode exposure in production | If `chatbot.demo.enabled=true` (env `CHATBOT_DEMO`) is left on in production, `/chatbot/demo` is reachable and `LLMClient` is bound to `FakeClient`. Hosts must keep this off outside development. |
 
 ---
 
