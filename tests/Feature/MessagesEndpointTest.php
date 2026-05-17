@@ -84,7 +84,9 @@ it('rejects a POST with a tampered signed_context', function (): void {
     $envelope = $this->extractSignedContext($this->get('/orders/7'));
 
     [$body, $sig] = explode('.', $envelope);
-    $tampered = $body.'.'.substr($sig, 0, -1).'A';
+    $lastBodyChar = substr($body, -1);
+    $replacement = $lastBodyChar === 'A' ? 'B' : 'A';
+    $tampered = substr($body, 0, -1).$replacement.'.'.$sig;
 
     $response = $this->postJson('/chatbot/messages', [
         'signed_context' => $tampered,
