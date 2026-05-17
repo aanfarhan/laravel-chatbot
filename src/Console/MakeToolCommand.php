@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 final class MakeToolCommand extends Command
 {
-    protected $signature = 'chatbot:make-tool {name : Class or tool name (e.g. GetWeather or get_weather)}';
+    protected $signature = 'chatbot:make-tool {name : Class or tool name (e.g. GetWeather or get_weather)} {--force : Overwrite an existing tool file}';
 
     protected $description = 'Scaffold a new ChatbotTool implementation under app/Chatbot/Tools';
 
@@ -25,13 +25,20 @@ final class MakeToolCommand extends Command
             mkdir($dir, 0755, true);
         }
 
+        $target = $dir.'/'.$class.'.php';
+        if (file_exists($target) && ! $this->option('force')) {
+            $this->error('Tool '.$class.' already exists. Use --force to overwrite.');
+
+            return self::FAILURE;
+        }
+
         $stub = (string) file_get_contents($this->resolveStubPath());
         $rendered = str_replace(['{{ class }}', '{{ name }}'], [$class, $toolName], $stub);
 
-        file_put_contents($dir.'/'.$class.'.php', $rendered);
+        file_put_contents($target, $rendered);
 
         $fqcn = 'App\\Chatbot\\Tools\\'.$class;
-        $this->info('Created '.$dir.'/'.$class.'.php');
+        $this->info('Created '.$target);
         $this->line('Register it in a service provider:');
         $this->line('    Chatbot::registerTool(\\'.$fqcn.'::class);');
 

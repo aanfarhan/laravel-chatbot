@@ -177,7 +177,7 @@ The fastest way to start is the scaffolder, which writes a worked-example class 
 php artisan chatbot:make-tool GetWeather
 ```
 
-The generated class implements `ChatbotTool` with a realistic `parameters()` schema, an `authorize()` body that requires an authenticated `$actor` (see ADR-0003), and `// TODO` markers for the bits you fill in. The command prints the exact `Chatbot::registerTool(...)` line to paste into a service provider. To customize the template across your app, publish the stub with `php artisan vendor:publish --tag=chatbot-stubs` and edit `stubs/chatbot-tool.stub` — the command prefers the published copy when present.
+The generated class implements `ChatbotTool` with a realistic `parameters()` schema, an `authorize()` body that requires an authenticated `$actor` (see ADR-0003), and `// TODO` markers for the bits you fill in. The command prints the exact `Chatbot::registerTool(...)` line to paste into a service provider. Re-running against an existing file fails fast with a `Use --force to overwrite` message; pass `--force` to regenerate. To customize the template across your app, publish the stub with `php artisan vendor:publish --tag=chatbot-stubs` and edit `stubs/chatbot-tool.stub` — the command prefers the published copy when present.
 
 The hand-written form below is still fully supported:
 

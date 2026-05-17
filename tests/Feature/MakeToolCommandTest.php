@@ -124,6 +124,46 @@ it('prefers a host-published stub over the package default', function (): void {
 
 // --- Slice 8: stub publish group registered ---
 
+// --- Slice 2 (issue 02): hardening ---
+
+it('refuses to overwrite an existing tool file without --force', function (): void {
+    $this->artisan('chatbot:make-tool', ['name' => 'GetWeather'])->assertExitCode(0);
+
+    $path = makeToolPath('GetWeatherTool.php');
+    file_put_contents($path, '<?php // ORIGINAL_MARKER');
+
+    $this->artisan('chatbot:make-tool', ['name' => 'GetWeather'])
+        ->expectsOutputToContain('Tool GetWeatherTool already exists. Use --force to overwrite.')
+        ->assertExitCode(1);
+
+    expect((string) file_get_contents($path))->toContain('ORIGINAL_MARKER');
+});
+
+it('overwrites an existing tool file when --force is passed', function (): void {
+    $this->artisan('chatbot:make-tool', ['name' => 'GetWeather'])->assertExitCode(0);
+
+    $path = makeToolPath('GetWeatherTool.php');
+    file_put_contents($path, '<?php // ORIGINAL_MARKER');
+
+    $this->artisan('chatbot:make-tool', ['name' => 'GetWeather', '--force' => true])
+        ->assertExitCode(0);
+
+    expect((string) file_get_contents($path))
+        ->not->toContain('ORIGINAL_MARKER')
+        ->toContain('class GetWeatherTool');
+});
+
+it('produces identical generated contents for snake_case, StudlyCase, and StudlyCase+Tool inputs', function (): void {
+    $renders = [];
+    foreach (['get_weather', 'GetWeather', 'GetWeatherTool'] as $input) {
+        $this->artisan('chatbot:make-tool', ['name' => $input, '--force' => true])->assertExitCode(0);
+        $renders[$input] = (string) file_get_contents(makeToolPath('GetWeatherTool.php'));
+    }
+
+    expect($renders['GetWeather'])->toBe($renders['get_weather']);
+    expect($renders['GetWeatherTool'])->toBe($renders['get_weather']);
+});
+
 it('registers the stub file under a publish group so stub:publish can pick it up', function (): void {
     $paths = ServiceProvider::pathsToPublish(ChatbotServiceProvider::class, 'chatbot-stubs');
 
