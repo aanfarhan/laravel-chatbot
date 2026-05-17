@@ -1,0 +1,57 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Chatbot\Tools;
+
+use Aanfarhan\Chatbot\Contracts\ChatbotTool;
+use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
+
+final class {{ class }} implements ChatbotTool
+{
+    public function name(): string
+    {
+        return '{{ name }}';
+    }
+
+    public function description(): string
+    {
+        // TODO: describe what this tool does, in language the LLM will read.
+        return 'TODO: one-sentence description of what {{ name }} returns.';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function parameters(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'query' => [
+                    'type' => 'string',
+                    'description' => 'TODO: describe this parameter.',
+                ],
+            ],
+            'required' => ['query'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
+    {
+        // TODO: scope authorization to $actor. Per ADR-0003, never read identity
+        // from $invocation->args — only LLM-supplied arguments live there.
+        return $actor !== null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): array
+    {
+        // TODO: implement the tool. Scope every data access by $actor.
+        return ['result' => 'TODO'];
+    }
+}

@@ -93,12 +93,17 @@ final class ChatbotServiceProvider extends ServiceProvider
                 Console\AnonymizeUserCommand::class,
                 Console\DeleteGuestCommand::class,
                 Console\InspectPromptCommand::class,
+                Console\MakeToolCommand::class,
             ]);
         }
 
         $this->publishes([
             __DIR__.'/../config/chatbot.php' => $this->app->configPath('chatbot.php'),
         ], 'chatbot-config');
+
+        $this->publishes([
+            __DIR__.'/Console/stubs/chatbot-tool.stub' => $this->app->basePath('stubs/chatbot-tool.stub'),
+        ], 'chatbot-stubs');
 
         Blade::directive('chatbot', function (string $expression): string {
             $arg = trim($expression) === '' ? "'default'" : $expression;
