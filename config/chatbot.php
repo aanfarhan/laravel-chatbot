@@ -102,6 +102,7 @@ return [
         'max_calls_per_turn' => (int) env('CHATBOT_TOOLS_MAX_CALLS_PER_TURN', 5),
         'default_timeout' => (int) env('CHATBOT_TOOLS_DEFAULT_TIMEOUT', 10),
         'replay_freshness' => (int) env('CHATBOT_TOOLS_REPLAY_FRESHNESS', 300),
+        'default_max_arg_length' => (int) env('CHATBOT_TOOLS_DEFAULT_MAX_ARG_LENGTH', 10240),
     ],
 
     /*

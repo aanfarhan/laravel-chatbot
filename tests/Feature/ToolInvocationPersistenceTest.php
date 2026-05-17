@@ -67,7 +67,7 @@ it('coordinator writes a chatbot_tool_invocations row for a successful invocatio
 
 // --- Persistence on failure ---
 
-it('coordinator writes a status=failed row when the handler throws', function (): void {
+it('coordinator writes a status=handler_error row when the handler throws', function (): void {
     Chatbot::registerTool(FailingTool::class);
 
     $fake = Chatbot::fake();
@@ -97,7 +97,7 @@ it('coordinator writes a status=failed row when the handler throws', function ()
 
     $all = DB::table('chatbot_tool_invocations')->where('conversation_id', $conversation->id)->get();
     expect($all)->toHaveCount(1);
-    expect($all[0]->status)->toBe('failed');
+    expect($all[0]->status)->toBe('handler_error');
     expect($all[0]->error)->not->toBeNull();
 });
 

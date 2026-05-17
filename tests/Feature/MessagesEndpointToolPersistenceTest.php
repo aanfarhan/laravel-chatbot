@@ -57,7 +57,7 @@ it('writes a chatbot_tool_invocations row with status=ok after a successful tool
     expect($rows[0]->status)->toBe('ok');
 });
 
-it('writes a chatbot_tool_invocations row with status=failed when the handler throws via the endpoint', function (): void {
+it('writes a chatbot_tool_invocations row with status=handler_error when the handler throws via the endpoint', function (): void {
     Chatbot::registerTool(FailingTool::class);
     Chatbot::tools(['failing_op']);
 
@@ -76,6 +76,6 @@ it('writes a chatbot_tool_invocations row with status=failed when the handler th
 
     $rows = DB::table('chatbot_tool_invocations')->get();
     expect($rows)->toHaveCount(1);
-    expect($rows[0]->status)->toBe('failed');
+    expect($rows[0]->status)->toBe('handler_error');
     expect($rows[0]->error)->not->toBeNull();
 });

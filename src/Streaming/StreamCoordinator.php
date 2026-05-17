@@ -15,6 +15,7 @@ use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
+use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -31,6 +32,8 @@ final class StreamCoordinator
 
     private const RESULT_SIZE_CAP = 4096;
 
+    private ?ToolArgumentValidator $argumentValidator = null;
+
     public function __construct(
         private readonly LLMClient $llm,
         private readonly ConversationStore $store,
@@ -41,6 +44,16 @@ final class StreamCoordinator
         private readonly ?ToolRegistry $toolRegistry = null,
         private readonly ?ToolInvocationStore $toolInvocationStore = null,
     ) {}
+
+    private function argumentValidator(): ToolArgumentValidator
+    {
+        if ($this->argumentValidator === null) {
+            $raw = $this->config->get('chatbot.tools.default_max_arg_length', 10240);
+            $this->argumentValidator = new ToolArgumentValidator(is_int($raw) ? $raw : 10240);
+        }
+
+        return $this->argumentValidator;
+    }
 
     /**
      * @param  list<array<string, mixed>>  $messages
@@ -322,6 +335,20 @@ final class StreamCoordinator
         /** @var array<string, mixed> $args */
         $args = is_array($decoded) ? $decoded : [];
 
+        if (! $this->argumentValidator()->validate($tool->parameters(), $args)) {
+            $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+
+            $errorMsg = 'arguments did not match schema';
+            $this->persistInvocation($conversationId, $name, $args, '', 'rejected_schema', $errorMsg, now());
+
+            return [
+                'role' => 'tool',
+                'tool_call_id' => $callId,
+                'name' => $name,
+                'content' => $errorMsg,
+            ];
+        }
+
         $invocation = new ToolInvocation(
             args: $args,
             channel: $channel,
@@ -337,7 +364,7 @@ final class StreamCoordinator
                 $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
 
                 $errorMsg = "[error: not authorized to call tool '{$name}']";
-                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'failed', 'not authorized', $startedAt);
+                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', 'not authorized', $startedAt);
 
                 return [
                     'role' => 'tool',
@@ -354,7 +381,7 @@ final class StreamCoordinator
                 $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
 
                 $errorMsg = "[error: tool '{$name}' timed out]";
-                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'failed', 'timed out', $startedAt);
+                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', 'timed out', $startedAt);
 
                 return [
                     'role' => 'tool',
@@ -384,7 +411,7 @@ final class StreamCoordinator
             $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
 
             $errorMsg = "[error: tool '{$name}' threw an exception: {$e->getMessage()}]";
-            $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'failed', $e->getMessage(), $startedAt);
+            $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', $e->getMessage(), $startedAt);
 
             return [
                 'role' => 'tool',
