@@ -24,6 +24,8 @@ This package mediates between a host Laravel application and a third-party LLM. 
 | Prompt-size blowup | `chatbot.token_cap` (default 32768) bounds assembled input tokens; oldest history turns are pruned first. A user message that alone exceeds the cap raises `ChatbotTokenCapExceededException`. |
 | API budget exhaustion | `DailyUsageTracker` enforces per-user/per-day token quotas (`chatbot.daily_quota.input` / `.output`, defaults 200k / 50k, UTC-reset). Exhaustion raises `ChatbotQuotaExceededException`, surfaced as an SSE `error` event. |
 | Tool-call abuse | `chatbot.tools.max_calls_per_turn` (default 5) caps total tool invocations per user message across all loop iterations; the cap injects a synthetic budget-exhausted tool result instead of looping. `chatbot.tools.replay_freshness` (default 300 s) re-uses recent tool results from `ToolInvocationStore` rather than re-invoking. |
+| Identity spoofing via tool arguments | `ChatbotTool::handle()` and `authorize()` receive the verified threaded actor as a typed first parameter (`?Authenticatable $actor`); the argument is injected by the framework, not supplied by the LLM. `ToolRegistry` rejects at boot any tool whose parameter schema declares an identity-shaped name (`user_id`, `userId`, `account_id`, `tenant_id`, `on_behalf_of`, and variants). See ADR-0003. |
+| Malformed / oversize tool arguments | Strict JSON-schema validation runs before `authorize()`; a mismatch short-circuits the call, counts against `max_calls_per_turn`, is persisted as `rejected_schema`, and surfaces to the widget as a `failed` tool-status event. Per-string-field size is capped at `chatbot.tools.default_max_arg_length` (default 10240 bytes). |
 
 ---
 
@@ -36,7 +38,7 @@ This package mediates between a host Laravel application and a third-party LLM. 
 | Base64-encoded or obfuscated payloads | The sanitizer operates on plaintext strings; it does not decode or classify encoded content. |
 | Two-pass content classification | No secondary classifier runs on LLM output to detect policy violations before display. |
 | Automatic retry / model fallback | If the LLM returns an error or an empty response, the package surfaces the failure; it does not retry or switch models. (`OpenAiCompatibleClient` does retry once without `tools` on a 400 tools-rejection, but that is a compatibility fallback, not a general retry policy.) |
-| Outbound tool side effects | Registered tools run with the application's full privileges. The package caps call count and per-call wall-clock time, but does not sandbox arguments, network egress, or filesystem access — host-supplied tool implementations are trusted code. |
+| Outbound tool side effects | Argument-level sandboxing (identity-arg blocking, schema validation, size cap) is in scope and covered above. Network egress and filesystem/capability isolation remain out of scope — these are host/infrastructure concerns. |
 | Demo-mode exposure in production | If `chatbot.demo.enabled=true` (env `CHATBOT_DEMO`) is left on in production, `/chatbot/demo` is reachable and `LLMClient` is bound to `FakeClient`. Hosts must keep this off outside development. |
 
 ---
