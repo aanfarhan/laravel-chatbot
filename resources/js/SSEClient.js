@@ -2,8 +2,9 @@ export class SSEClient extends EventTarget {
   #fetchImpl
   #aborted = false
   #reader = null
+  #currentEvent = null
 
-  constructor(fetchImpl = globalThis.fetch) {
+  constructor(fetchImpl = globalThis.fetch.bind(globalThis)) {
     super()
     this.#fetchImpl = fetchImpl
   }
@@ -31,7 +32,11 @@ export class SSEClient extends EventTarget {
 
       for (const line of lines) {
         if (this.#aborted) break
-        this.#parseLine(line)
+        if (line === '') {
+          this.#currentEvent = null
+        } else {
+          this.#parseLine(line)
+        }
       }
     }
 
@@ -39,6 +44,11 @@ export class SSEClient extends EventTarget {
   }
 
   #parseLine(line) {
+    if (line.startsWith('event: ')) {
+      this.#currentEvent = line.slice(7).trim()
+      return
+    }
+
     if (!line.startsWith('data: ')) return
 
     const raw = line.slice(6)
@@ -49,12 +59,13 @@ export class SSEClient extends EventTarget {
       return
     }
 
-    switch (payload.type) {
+    const eventType = this.#currentEvent ?? payload.type
+    switch (eventType) {
       case 'token':
-        this.dispatchEvent(new CustomEvent('chunk', { detail: { text: payload.text } }))
+        this.dispatchEvent(new CustomEvent('chunk', { detail: { text: payload.content ?? payload.text } }))
         break
       case 'done':
-        this.dispatchEvent(new CustomEvent('done', { detail: { usage: payload.usage } }))
+        this.dispatchEvent(new CustomEvent('done', { detail: { conversationId: payload.conversation_id, usage: payload.usage } }))
         break
       case 'error':
         this.dispatchEvent(new CustomEvent('error', {
@@ -62,12 +73,12 @@ export class SSEClient extends EventTarget {
         }))
         break
       case 'context_summary':
-        this.dispatchEvent(new CustomEvent('context_summary', { detail: { text: payload.text } }))
+        this.dispatchEvent(new CustomEvent('context_summary', { detail: { text: payload.summary ?? payload.text } }))
         break
       case 'tool_started':
       case 'tool_finished':
       case 'tool_failed':
-        this.dispatchEvent(new CustomEvent(payload.type, { detail: { name: payload.name, phase: payload.phase } }))
+        this.dispatchEvent(new CustomEvent(eventType, { detail: { name: payload.name, phase: payload.phase } }))
         break
     }
   }

@@ -15,3 +15,10 @@ Route::post('/chatbot/messages', MessagesController::class)
 
 Route::get('/chatbot/conversations/{id}/messages', HistoryController::class)
     ->name('chatbot.conversations.messages');
+
+Route::get('/chatbot/widget.js', function () {
+    return response()->file(
+        __DIR__.'/../dist/chatbot-widget.js',
+        ['Content-Type' => 'application/javascript; charset=UTF-8'],
+    );
+})->name('chatbot.widget-js');

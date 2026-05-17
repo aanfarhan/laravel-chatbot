@@ -231,6 +231,7 @@ final class StreamCoordinator
                     $this->logger?->info('[chatbot] turn failed', $logContext);
                 } else {
                     $this->emit('done', [
+                        'conversation_id' => $conversationId,
                         'usage' => [
                             'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
                             'output_tokens' => $usage !== null ? $usage->outputTokens : 0,

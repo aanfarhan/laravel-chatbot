@@ -298,6 +298,7 @@ final class Chatbot
         );
 
         return sprintf(
+            "<script type=\"module\" src=\"/chatbot/widget.js\"></script>\n".
             '<chatbot-widget channel="%s" signed-context="%s"></chatbot-widget>',
             htmlspecialchars($channel, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars($token, ENT_QUOTES, 'UTF-8'),

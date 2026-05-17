@@ -212,10 +212,8 @@ class ChatbotWidget extends HTMLElement {
   connectedCallback() {
     this.#render()
     this.#restoreState()
-    this.#loadGreeting()
+    this.#loadHistory()
     this.addEventListener('tool_started', (e) => this.#showToolStatus(e.detail.name))
-    this.addEventListener('tool_finished', () => this.#hideToolStatus())
-    this.addEventListener('tool_failed', () => this.#hideToolStatus())
   }
 
   attributeChangedCallback() {
@@ -304,6 +302,7 @@ class ChatbotWidget extends HTMLElement {
     const panel = this.#panel()
     if (panel) panel.hidden = !this.#open
     localStorage.setItem(STORAGE_KEY(this.channel), this.#open ? '1' : '0')
+    if (this.#open) this.#inputEl()?.focus()
   }
 
   #restoreState() {
@@ -316,12 +315,35 @@ class ChatbotWidget extends HTMLElement {
   }
 
   #loadGreeting() {
-    const envelope = document.querySelector('meta[name="chatbot-context"]')?.content
+    const envelope = this.getAttribute('signed-context')
     if (!envelope) return
     try {
       const payload = JSON.parse(atob(envelope.split('.')[1] ?? ''))
       if (payload.greeting) this.#appendAssistant(payload.greeting)
     } catch { /* no greeting */ }
+  }
+
+  async #loadHistory() {
+    const conversationId = localStorage.getItem(CONV_KEY(this.channel))
+    if (!conversationId) {
+      this.#loadGreeting()
+      return
+    }
+    try {
+      const response = await fetch(`/chatbot/conversations/${conversationId}/messages`)
+      if (!response.ok) {
+        localStorage.removeItem(CONV_KEY(this.channel))
+        this.#loadGreeting()
+        return
+      }
+      const { messages } = await response.json()
+      for (const msg of messages) {
+        if (msg.role === 'user') this.#appendUser(msg.content)
+        else if (msg.role === 'assistant') this.#appendAssistant(msg.content)
+      }
+    } catch {
+      this.#loadGreeting()
+    }
   }
 
   #newConversation() {
@@ -344,7 +366,7 @@ class ChatbotWidget extends HTMLElement {
     input.value = ''
     this.#appendUser(text)
 
-    const envelope = document.querySelector('meta[name="chatbot-context"]')?.content
+    const envelope = this.getAttribute('signed-context')
     const conversationId = localStorage.getItem(CONV_KEY(this.channel))
 
     this.#streaming = true
@@ -381,19 +403,24 @@ class ChatbotWidget extends HTMLElement {
 
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content
 
-    await client.connect('/chatbot/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-        ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
-      },
-      body: JSON.stringify({
-        message: text,
-        signed_context: envelope,
-        ...(conversationId ? { conversation_id: conversationId } : {}),
-      }),
-    })
+    try {
+      await client.connect('/chatbot/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+        },
+        body: JSON.stringify({
+          message: text,
+          signed_context: envelope,
+          ...(conversationId ? { conversation_id: conversationId } : {}),
+        }),
+      })
+    } catch {
+      this.#handleStreamError({ code: 'network_error', message: 'Connection failed.', retryable: true }, bubble, text, envelope, conversationId)
+      this.#finishStreaming()
+    }
   }
 
   #appendUser(text) {
@@ -512,17 +539,17 @@ class ChatbotWidget extends HTMLElement {
   #showToolStatus(name) {
     if (!this.#toolStatusEl) return
     this.#toolStatusEl.textContent = `Working: ${name}…`
-    this.#toolStatusEl.hidden = false
+    this.#toolStatusEl.removeAttribute('hidden')
   }
 
   #hideToolStatus() {
     if (!this.#toolStatusEl) return
-    this.#toolStatusEl.hidden = true
+    this.#toolStatusEl.setAttribute('hidden', '')
   }
 
   #finishStreaming() {
     this.#streaming = false
-    this.#hideToolStatus()
+    setTimeout(() => this.#hideToolStatus(), 500)
     const btn = this.#sendBtn()
     if (btn) btn.disabled = false
   }

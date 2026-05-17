@@ -29,22 +29,22 @@ describe('chatbot-widget tool-status chip', () => {
     expect(chip.hidden).toBe(false)
   })
 
-  it('hides the chip when tool_finished fires', () => {
+  it('keeps the chip visible when tool_finished fires (hides only on stream done)', () => {
     dispatchToolEvent(widget, 'tool_started', 'lookup_order', 'started')
     dispatchToolEvent(widget, 'tool_finished', 'lookup_order', 'finished')
 
     const chip = widget.shadowRoot.querySelector('[part="tool-status"]')
     expect(chip).not.toBeNull()
-    expect(chip.hidden).toBe(true)
+    expect(chip.hidden).toBe(false)
   })
 
-  it('hides the chip when tool_failed fires', () => {
+  it('keeps the chip visible when tool_failed fires (hides only on stream done)', () => {
     dispatchToolEvent(widget, 'tool_started', 'lookup_order', 'started')
     dispatchToolEvent(widget, 'tool_failed', 'lookup_order', 'failed')
 
     const chip = widget.shadowRoot.querySelector('[part="tool-status"]')
     expect(chip).not.toBeNull()
-    expect(chip.hidden).toBe(true)
+    expect(chip.hidden).toBe(false)
   })
 
   it('updates chip text on a new tool_started before previous terminal event', () => {
