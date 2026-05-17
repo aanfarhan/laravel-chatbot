@@ -7,6 +7,7 @@ namespace Aanfarhan\Chatbot\Tests\Stubs;
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\PersistableTool;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 final class RedactingOrderTool implements ChatbotTool, PersistableTool
 {
@@ -32,13 +33,13 @@ final class RedactingOrderTool implements ChatbotTool, PersistableTool
         ];
     }
 
-    public function authorize(ToolInvocation $invocation): bool
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
     {
         return true;
     }
 
     /** @return array<string, mixed> */
-    public function handle(ToolInvocation $invocation): array
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): array
     {
         return [
             'order_id' => $invocation->args['order_id'],

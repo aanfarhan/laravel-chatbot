@@ -6,6 +6,7 @@ namespace Aanfarhan\Chatbot\Tests\Stubs;
 
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 final class FailingTool implements ChatbotTool
 {
@@ -25,13 +26,13 @@ final class FailingTool implements ChatbotTool
         return ['type' => 'object', 'properties' => []];
     }
 
-    public function authorize(ToolInvocation $invocation): bool
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
     {
         return true;
     }
 
     /** @return array<string, mixed>|string */
-    public function handle(ToolInvocation $invocation): array|string
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): array|string
     {
         throw new \RuntimeException('simulated tool failure');
     }

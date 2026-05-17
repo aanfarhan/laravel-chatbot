@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot\Tests\Stubs;
 
 use Aanfarhan\Chatbot\Concerns\HasChatbotData;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
-/** @internal Stub user model used to exercise the HasChatbotData trait in tests. */
-final class FakeUser extends Model
+/** @internal Stub user model used to exercise the HasChatbotData trait in tests. Implements Authenticatable so it can be used with actingAs(). */
+final class FakeUser extends Authenticatable
 {
     use HasChatbotData;
 

@@ -25,7 +25,7 @@ The static, host-supplied data block injected into the system prompt at conversa
 A named widget mount point (e.g. `default`, `admin`). Carries its own prompt, context, and — under this feature — tool allowlist.
 
 ### Tool invocation
-A single execution of a [[tool]] handler triggered by the LLM. Carries the LLM-supplied arguments, the authenticated actor (or null for guests), the channel, and the verified static context from the envelope. The package calls the tool's `authorize()` with this invocation before `handle()`; both methods are required on the contract so authorization is never an accidental omission. Handlers should scope by the threaded actor, never by LLM-supplied identity arguments.
+A single execution of a [[tool]] handler triggered by the LLM. Carries the LLM-supplied arguments, the channel, and the verified static context from the envelope. The [[threaded-actor]] is NOT on the invocation; it is passed as a separate typed first parameter to `authorize()` and `handle()` (see ADR-0003). The package calls the tool's `authorize()` before `handle()`; both methods are required on the contract so authorization is never an accidental omission.
 
 ### Tool-call loop
 The provider-driven cycle within a single user message: model emits `tool_calls` → server resolves each call against the [[tool-registry]] (gated by the [[tool-allowlist]]) → executes handlers → appends results as `role: tool` messages → re-invokes the provider. Repeats until the model produces final prose or a configured iteration cap is hit.
@@ -41,3 +41,12 @@ The maximum age of a stored [[tool-invocation-record]] for which its result is r
 
 ### Context envelope
 The signed, short-lived token minted at page render that carries the channel's context payload and metadata to the `/messages` endpoint. Will be extended to carry the tool allowlist.
+
+### Threaded actor
+The authenticated host-side identity (or `null` for guests) that owns the conversation turn. Reconstituted server-side from the verified envelope's `userId` via the configured auth guard's user provider and passed as the typed first parameter to `ChatbotTool::authorize()` and `ChatbotTool::handle()`, so handler-side authorization and scoping cannot accidentally read identity from LLM-supplied arguments. Contrast with any actor-shaped value in tool arguments, which is never trusted.
+
+### Identity-shaped argument
+A tool parameter whose name suggests it identifies an actor or tenant (`user_id`, `account_id`, `tenant_id`, etc.). Forbidden at tool registration: the package rejects any [[tool-definition]] declaring one, on the rule that scoping must use the [[threaded-actor]], not LLM-supplied identity.
+
+### Argument schema validation
+The package-owned, pre-`authorize()` check that LLM-supplied tool arguments conform to the [[tool-definition]]'s declared JSON schema. Strict (no coercion, no extra fields, capped string length). Failures count against [[tool-call-loop]] budget and are persisted as a [[tool-invocation-record]] with a rejection status.

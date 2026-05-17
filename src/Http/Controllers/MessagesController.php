@@ -17,6 +17,7 @@ use Aanfarhan\Chatbot\PromptAssembler;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Cache\RateLimiter;
+use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +40,7 @@ final class MessagesController
         private readonly Chatbot $chatbot,
         private readonly RateLimiter $rateLimiter,
         private readonly ToolInvocationStore $toolInvocationStore,
+        private readonly AuthFactory $auth,
         private readonly ?LoggerInterface $logger = null,
     ) {}
 
@@ -107,6 +109,11 @@ final class MessagesController
 
         $coordinator = new StreamCoordinator($this->llm, $this->store, $this->config, events: $this->events, logger: $this->logger, toolRegistry: app(ToolRegistry::class), toolInvocationStore: $this->toolInvocationStore);
 
+        $actor = null;
+        if ($verified->userId !== null) {
+            $actor = $this->auth->guard()->getProvider()->retrieveById($verified->userId);
+        }
+
         $quotaPreflight = function () use ($request): void {
             $quota = $this->chatbot->resolveQuota($request);
             if (! $quota['allow']) {
@@ -127,6 +134,7 @@ final class MessagesController
             contextSummary: $verified->summary,
             channel: $verified->channel,
             allowedTools: $verified->allowedTools,
+            actor: $actor,
         );
 
         $streamed->headers->set('Content-Type', 'text/event-stream; charset=UTF-8');

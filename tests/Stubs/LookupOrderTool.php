@@ -6,6 +6,7 @@ namespace Aanfarhan\Chatbot\Tests\Stubs;
 
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 final class LookupOrderTool implements ChatbotTool
 {
@@ -31,13 +32,13 @@ final class LookupOrderTool implements ChatbotTool
         ];
     }
 
-    public function authorize(ToolInvocation $invocation): bool
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
     {
         return true;
     }
 
     /** @return array<string, mixed> */
-    public function handle(ToolInvocation $invocation): array
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): array
     {
         return ['status' => 'confirmed', 'order_id' => $invocation->args['order_id']];
     }

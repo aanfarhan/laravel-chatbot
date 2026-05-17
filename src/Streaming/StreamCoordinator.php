@@ -17,6 +17,7 @@ use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -56,6 +57,7 @@ final class StreamCoordinator
         ?string $contextSummary = null,
         string $channel = 'default',
         ?array $allowedTools = null,
+        ?Authenticatable $actor = null,
     ): StreamedResponse {
         $isAborted ??= static fn (): bool => (bool) connection_aborted();
         $rawDuration = $this->config->get('chatbot.stream_duration', 60);
@@ -73,6 +75,7 @@ final class StreamCoordinator
             $contextSummary,
             $channel,
             $allowedTools,
+            $actor,
         ): void {
             $this->incrementCounter();
             $startedAt = microtime(true);
@@ -173,6 +176,7 @@ final class StreamCoordinator
                             channel: $channel,
                             conversationId: $conversationId,
                             allowedTools: $allowedTools,
+                            actor: $actor,
                         );
                         $callsThisTurn++;
                     }
@@ -292,7 +296,7 @@ final class StreamCoordinator
      * @param  list<string>|null  $allowedTools
      * @return array{role: string, tool_call_id: string, name: string, content: string}
      */
-    private function invokeToolCall(string $name, string $argumentsJson, string $callId, string $channel, int $conversationId, ?array $allowedTools = null): array
+    private function invokeToolCall(string $name, string $argumentsJson, string $callId, string $channel, int $conversationId, ?array $allowedTools = null, ?Authenticatable $actor = null): array
     {
         if ($allowedTools !== null && ! in_array($name, $allowedTools, true)) {
             return [
@@ -320,7 +324,6 @@ final class StreamCoordinator
 
         $invocation = new ToolInvocation(
             args: $args,
-            actor: null,
             channel: $channel,
             context: [],
         );
@@ -330,7 +333,7 @@ final class StreamCoordinator
         $startedAt = now();
 
         try {
-            if (! $tool->authorize($invocation)) {
+            if (! $tool->authorize($actor, $invocation)) {
                 $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
 
                 $errorMsg = "[error: not authorized to call tool '{$name}']";
@@ -345,7 +348,7 @@ final class StreamCoordinator
             }
 
             $deadline = microtime(true) + $this->defaultTimeout();
-            $result = $tool->handle($invocation);
+            $result = $tool->handle($actor, $invocation);
 
             if (microtime(true) > $deadline) {
                 $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);

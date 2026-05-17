@@ -6,6 +6,7 @@ namespace Aanfarhan\Chatbot\Tests\Stubs;
 
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 final class BigResultTool implements ChatbotTool
 {
@@ -25,12 +26,12 @@ final class BigResultTool implements ChatbotTool
         return ['type' => 'object', 'properties' => []];
     }
 
-    public function authorize(ToolInvocation $invocation): bool
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
     {
         return true;
     }
 
-    public function handle(ToolInvocation $invocation): string
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): string
     {
         return str_repeat('x', 5000);
     }

@@ -6,6 +6,7 @@ namespace Aanfarhan\Chatbot\Tests\Stubs;
 
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 final class UnauthorizedTool implements ChatbotTool
 {
@@ -25,12 +26,12 @@ final class UnauthorizedTool implements ChatbotTool
         return ['type' => 'object', 'properties' => []];
     }
 
-    public function authorize(ToolInvocation $invocation): bool
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
     {
         return false;
     }
 
-    public function handle(ToolInvocation $invocation): string
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): string
     {
         return 'should never run';
     }

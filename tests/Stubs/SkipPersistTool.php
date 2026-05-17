@@ -7,6 +7,7 @@ namespace Aanfarhan\Chatbot\Tests\Stubs;
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\PersistableTool;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 final class SkipPersistTool implements ChatbotTool, PersistableTool
 {
@@ -26,12 +27,12 @@ final class SkipPersistTool implements ChatbotTool, PersistableTool
         return ['type' => 'object', 'properties' => []];
     }
 
-    public function authorize(ToolInvocation $invocation): bool
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
     {
         return true;
     }
 
-    public function handle(ToolInvocation $invocation): string
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): string
     {
         return 'done';
     }
