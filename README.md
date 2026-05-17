@@ -11,7 +11,7 @@ A Composer package that drops a context-aware chatbox onto any Laravel page. Dec
 ## Installation
 
 ```bash
-composer require aanfarhan/chatbot
+composer require aanfarhan/laravel-chatbot
 php artisan chatbot:install
 ```
 
@@ -155,9 +155,9 @@ Channel defaults live in `config/chatbot.php`:
 ```php
 'channels' => [
     'admin' => [
-        'model'         => 'gpt-4o',
-        'system_prompt' => 'You assist internal admin users.',
-        'throttle'      => ['per_minute' => 5, 'per_day' => 100],
+        'model'          => 'gpt-4o',
+        'system_prompt'  => 'You assist internal admin users.',
+        'throttle'       => ['per_minute' => 5, 'per_day' => 100],
         'retention_days' => 90,
     ],
 ],
@@ -165,54 +165,154 @@ Channel defaults live in `config/chatbot.php`:
 
 ---
 
-## Shipping order (v1 four-week sketch)
+## Tool calling
 
-| Week | Focus | End-of-week deliverable |
-|---|---|---|
-| 1 | **Skeleton** — package scaffolding, config, migrations, `LLMClient` interface + `OpenAiCompatibleClient` + `FakeClient`, facade with `context()` / `channel()` / `fake()`, signed envelope, layered prompt assembly, basic non-streaming `POST /chatbot/messages` | Integration test posts a message, gets a fake reply |
-| 2 | **Streaming + persistence** — SSE response, DB writes per turn, conversation cookie + rehydrate endpoint, typed exceptions + SSE error events, throttle + token caps | Real OpenAI-compatible streaming verified end-to-end |
-| 3 | **Frontend** — web component, markdown rendering, theming surface, mobile, regenerate/copy/rating UX, `chatbot:install`, demo seed | `chatbot:demo` works on a fresh Laravel app |
-| 4 | **Hardening** — prompt-injection sanitization, GDPR commands + trait, health endpoint, `chatbot:prune`, error UX polish, docs | `1.0.0-rc.1` published |
+Register tools in a service provider to let the LLM call your application code during a conversation turn.
 
----
+### Implementing a tool
 
-## SemVer commitments
+```php
+use Aanfarhan\Chatbot\Contracts\ChatbotTool;
+use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Illuminate\Contracts\Auth\Authenticatable;
 
-### Public contract (stable across minor and patch releases)
+final class LookupOrderTool implements ChatbotTool
+{
+    public function name(): string { return 'lookup_order'; }
 
-- `Chatbot` facade method signatures (`context`, `prompt`, `greeting`, `summary`, `channel`, `fake`, `quota`, `authorize`)
-- Config keys in `chatbot.php`
-- SSE event shape: `{type, ...}` with documented fields for `token`, `done`, `error`, `context_summary`, `tool_started`, `tool_finished`, `tool_failed`
-- Signed envelope shape (public payload fields)
-- Web component attributes: `channel`, `position`, `title`
-- CSS custom properties: all eight `--chatbot-*` properties listed above
-- CSS parts: all nine named parts listed above
-- Event class names: `ChatbotMessageStarted`, `ChatbotMessageCompleted`, `ChatbotMessageFailed`, `ChatbotSuspiciousContextDetected`
-- Typed exception class hierarchy under `ChatbotException`
+    public function description(): string
+    {
+        return 'Retrieve a single order by its ID for the authenticated user.';
+    }
 
-### Internal (may change in any release, including patches)
+    public function parameters(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'order_id' => ['type' => 'integer', 'description' => 'The order ID to fetch'],
+            ],
+            'required' => ['order_id'],
+        ];
+    }
 
-- Database schema — managed via migrations; run `php artisan migrate` on upgrade
-- Base system prompt content — it is prompt tuning, not a contract
-- HMAC algorithm and envelope encoding — the public interface is `mint/verify`, not the wire format
+    public function authorize(?Authenticatable $actor, ToolInvocation $invocation): bool
+    {
+        return $actor !== null; // deny guest turns
+    }
 
----
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for the full threat model, what v1 defends against, what it does not, and host responsibilities.
-
-### Inspect assembled prompts
-
-During pen-testing, use `chatbot:inspect-prompt` to see exactly what the LLM receives for any route without making a live request:
-
-```bash
-php artisan chatbot:inspect-prompt \
-  --route=orders.show \
-  --channel=default \
-  --user=42 \
-  --context-json=sample-order-context.json
+    public function handle(?Authenticatable $actor, ToolInvocation $invocation): array
+    {
+        return Order::where('user_id', $actor->getAuthIdentifier())
+            ->findOrFail($invocation->args['order_id'])
+            ->toArray();
+    }
+}
 ```
+
+**Security invariant:** the authenticated user identity is threaded via the typed `$actor` parameter, not via `$invocation->args`. Tool argument names that look like identity handles (`user_id`, `actor_id`, `account_id`, `tenant_id`, etc.) are blocked at registration time. See [ADR-0003](docs/adr/0003-threaded-actor-is-a-contract-parameter.md).
+
+### Registering tools
+
+```php
+// AppServiceProvider::boot()
+use Aanfarhan\Chatbot\Facades\Chatbot;
+
+Chatbot::registerTool(LookupOrderTool::class);
+```
+
+### Per-channel tool allowlists
+
+Restrict which tools are callable on a given channel via `Chatbot::tools()` (or `ChannelScope::tools()`):
+
+```php
+Chatbot::channel('support')
+    ->context(['ticket' => $ticket])
+    ->tools(['lookup_order', 'get_shipping_status']);
+```
+
+Any tool not in the allowlist is silently blocked for that channel even if it is registered globally.
+
+### Controlling tool behavior
+
+Config keys under `chatbot.tools`:
+
+| Key | Default | Description |
+|---|---|---|
+| `max_calls_per_turn` | `5` | Total tool invocations per user message before the budget-exhausted guard fires |
+| `default_timeout` | `10` | Per-tool wall-clock timeout in seconds |
+| `replay_freshness` | `300` | How many seconds a cached tool replay remains valid |
+| `default_max_arg_length` | `10240` | Max byte length for any single tool argument value |
+
+Set `chatbot.provider.supports_tools` to `false` for providers that do not implement the OpenAI tool-call protocol; this skips the registry entirely and omits the `tools` field from all requests.
+
+### Optional result persistence
+
+Implement `PersistableTool` to control what gets stored in the `chatbot_tool_invocations` table:
+
+```php
+use Aanfarhan\Chatbot\Contracts\PersistableTool;
+use Aanfarhan\Chatbot\Tools\ToolInvocation;
+
+final class LookupOrderTool implements ChatbotTool, PersistableTool
+{
+    // ... name/description/parameters/authorize/handle as above ...
+
+    public function persist(ToolInvocation $invocation, mixed $result): ?array
+    {
+        // return null to skip persistence entirely
+        return ['order_id' => $invocation->args['order_id'], 'status' => $result['status']];
+    }
+}
+```
+
+---
+
+## GDPR and user data
+
+Add the `HasChatbotData` trait to your `User` model to get built-in data access, deletion, and export:
+
+```php
+use Aanfarhan\Chatbot\Concerns\HasChatbotData;
+
+class User extends Authenticatable
+{
+    use HasChatbotData;
+}
+```
+
+The trait adds:
+
+- `$user->chatbotConversations()` — Eloquent relation to all conversations
+- `$user->deleteChatbotData(hard: false)` — soft-delete (or force-delete) all conversations
+- `$user->exportChatbotData()` — returns a `chatbot-export@1` array with all messages
+
+Console commands are also available for scripted operations (see [Console commands](#console-commands)).
+
+---
+
+## HTTP endpoints
+
+| Route | Description |
+|---|---|
+| `POST /chatbot/messages` | Send a message; returns an SSE stream |
+| `GET /chatbot/conversations/{id}/messages` | Fetch message history for a conversation |
+| `GET /chatbot/health` | Health probe; returns `{version, active_streams, status}` |
+| `GET /chatbot/widget.js` | Serves the bundled web component |
+
+### SSE event shape
+
+Every event sent on the `POST /chatbot/messages` stream has the form `{type, ...}`:
+
+| Event | Payload fields |
+|---|---|
+| `token` | `content` |
+| `done` | `conversation_id`, `usage: {input_tokens, output_tokens}` |
+| `error` | `code`, `message`, `retryable` |
+| `context_summary` | `summary` |
+| `tool_started` | `name`, `phase` |
+| `tool_finished` | `name`, `phase` |
+| `tool_failed` | `name`, `phase` |
 
 ---
 
@@ -228,6 +328,77 @@ php artisan chatbot:inspect-prompt \
 | `chatbot:export-user {id}` | Export a user's conversations as JSON or CSV (`--format`) |
 | `chatbot:anonymize-user {id}` | Scrub user identity while preserving token/cost aggregates |
 | `chatbot:delete-guest {token}` | Delete a guest token's conversations |
+
+### Inspect assembled prompts
+
+During pen-testing, use `chatbot:inspect-prompt` to see exactly what the LLM receives for any route without making a live request:
+
+```bash
+php artisan chatbot:inspect-prompt \
+  --route=orders.show \
+  --channel=default \
+  --user=42 \
+  --context-json=sample-order-context.json
+```
+
+---
+
+## Testing
+
+Use the `InteractsWithChatbot` trait in your feature tests to extract the signed context token from a rendered response and post it to the messages endpoint:
+
+```php
+use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
+
+class OrderChatTest extends TestCase
+{
+    use InteractsWithChatbot;
+
+    public function test_chat_replies_about_order(): void
+    {
+        $fake = Chatbot::fake();
+        $fake->addReply('Your order is on its way.');
+
+        $page = $this->get('/orders/1');
+        $token = $this->extractSignedContext($page);
+
+        $this->post('/chatbot/messages', [
+            'signed_context' => $token,
+            'message' => 'Where is my order?',
+        ])->assertOk();
+    }
+}
+```
+
+---
+
+## SemVer commitments
+
+### Public contract (stable across minor and patch releases)
+
+- `Chatbot` facade method signatures (`context`, `prompt`, `greeting`, `summary`, `channel`, `tools`, `registerTool`, `clearTools`, `fake`, `quota`, `authorize`)
+- Config keys in `chatbot.php`
+- SSE event shape: `{type, ...}` with documented fields for `token`, `done`, `error`, `context_summary`, `tool_started`, `tool_finished`, `tool_failed`
+- Signed envelope shape (public payload fields)
+- Web component attributes: `channel`, `position`, `title`
+- CSS custom properties: all eight `--chatbot-*` properties listed above
+- CSS parts: all nine named parts listed above
+- Event class names: `ChatbotMessageStarted`, `ChatbotMessageCompleted`, `ChatbotMessageFailed`, `ChatbotSuspiciousContextDetected`
+- Typed exception class hierarchy under `ChatbotException`
+- `ChatbotTool` and `PersistableTool` interface signatures
+- `ToolInvocation` public constructor and properties
+
+### Internal (may change in any release, including patches)
+
+- Database schema — managed via migrations; run `php artisan migrate` on upgrade
+- Base system prompt content — it is prompt tuning, not a contract
+- HMAC algorithm and envelope encoding — the public interface is `mint/verify`, not the wire format
+
+---
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the full threat model, what v1 defends against, what it does not, and host responsibilities.
 
 ---
 
