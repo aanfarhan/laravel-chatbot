@@ -102,6 +102,15 @@ const css = `
   padding: 2px 0 4px;
   align-self: flex-start;
 }
+.extractor-chip {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  align-self: flex-end;
+  max-width: fit-content;
+}
 .tool-status {
   font-size: 12px;
   color: #374151;
@@ -199,10 +208,15 @@ class ChatbotWidget extends HTMLElement {
   #lastAssistantBubble = null
   #contextSummary = null
   #toolStatusEl = null
+  #extractors = new Map()
 
   constructor() {
     super()
     this.#shadow = this.attachShadow({ mode: 'open' })
+  }
+
+  registerClientExtractor(name, fn, options = {}) {
+    this.#extractors.set(name, { fn, description: options.description })
   }
 
   get channel() { return this.getAttribute('channel') || 'default' }
@@ -214,6 +228,18 @@ class ChatbotWidget extends HTMLElement {
     this.#restoreState()
     this.#loadHistory()
     this.addEventListener('tool_started', (e) => this.#showToolStatus(e.detail.name))
+    queueMicrotask(() => this.#bootAllowlistCheck())
+  }
+
+  #bootAllowlistCheck() {
+    const allowed = this.#allowedExtractors(this.getAttribute('signed-context'))
+    for (const name of allowed) {
+      if (!this.#extractors.has(name)) {
+        console.error(
+          `Client extractor '${name}' is in the signed allowlist but has no matching JS registration on the widget.`
+        )
+      }
+    }
   }
 
   attributeChangedCallback() {
@@ -368,6 +394,9 @@ class ChatbotWidget extends HTMLElement {
 
     const envelope = this.getAttribute('signed-context')
     const conversationId = localStorage.getItem(CONV_KEY(this.channel))
+    const extractorBlocks = await this.#runExtractors(envelope)
+    this.#clearExtractorChips()
+    this.#renderExtractorChip(extractorBlocks)
 
     this.#streaming = true
     const btn = this.#sendBtn()
@@ -415,6 +444,7 @@ class ChatbotWidget extends HTMLElement {
           message: text,
           signed_context: envelope,
           ...(conversationId ? { conversation_id: conversationId } : {}),
+          ...(extractorBlocks.length ? { extractor_blocks: extractorBlocks } : {}),
         }),
       })
     } catch {
@@ -545,6 +575,67 @@ class ChatbotWidget extends HTMLElement {
   #hideToolStatus() {
     if (!this.#toolStatusEl) return
     this.#toolStatusEl.setAttribute('hidden', '')
+  }
+
+  #allowedExtractors(envelope) {
+    if (!envelope) return []
+    try {
+      const payload = JSON.parse(atob(envelope.split('.')[1] ?? ''))
+      return Array.isArray(payload.x) ? payload.x : []
+    } catch { return [] }
+  }
+
+  async #runExtractors(envelope) {
+    const allowed = this.#allowedExtractors(envelope)
+    if (allowed.length === 0) return []
+
+    const results = await Promise.all(allowed.map(async (name) => {
+      const entry = this.#extractors.get(name)
+      if (!entry) return null
+      const fn = entry.fn
+      try {
+        const value = await Promise.race([
+          Promise.resolve().then(() => fn()),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('__extractor_timeout__')), 250)),
+        ])
+        if (value === null || value === undefined || value === '') {
+          console.warn(`Client extractor '${name}' returned empty output; block omitted.`)
+          return null
+        }
+        let output = String(value)
+        const bytes = new TextEncoder().encode(output)
+        if (bytes.byteLength > 8192) {
+          const slice = bytes.slice(0, 8192 - 13) // room for marker
+          output = new TextDecoder('utf-8', { fatal: false }).decode(slice) + ' [truncated]'
+        }
+        return { name, output }
+      } catch (e) {
+        if (e && e.message === '__extractor_timeout__') {
+          console.warn(`Client extractor '${name}' exceeded 250ms timeout; block omitted.`)
+        } else {
+          console.error(`Client extractor '${name}' threw; block omitted.`, e)
+        }
+        return null
+      }
+    }))
+
+    return results.filter((b) => b !== null)
+  }
+
+  #clearExtractorChips() {
+    this.#shadow.querySelectorAll('[part="extractor-chip"]').forEach((el) => el.remove())
+  }
+
+  #renderExtractorChip(blocks) {
+    if (!blocks.length) return
+    const messages = this.#messagesEl()
+    if (!messages) return
+    const labels = blocks.map((b) => this.#extractors.get(b.name)?.description ?? b.name)
+    const chip = document.createElement('div')
+    chip.className = 'extractor-chip'
+    chip.setAttribute('part', 'extractor-chip')
+    chip.textContent = `Read from page: ${labels.join(', ')}`
+    messages.appendChild(chip)
   }
 
   #finishStreaming() {
