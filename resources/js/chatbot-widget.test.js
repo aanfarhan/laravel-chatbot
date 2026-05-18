@@ -185,6 +185,13 @@ describe('chatbot-widget client extractors', () => {
     expect(lastSendBody(captured)?.extractor_blocks).toBeUndefined()
   })
 
+  it('throws synchronously when host registers the reserved name blade-snapshot', () => {
+    widget = makeWidget()
+
+    expect(() => widget.registerClientExtractor('blade-snapshot', () => 'x'))
+      .toThrow(/blade-snapshot.*reserved/)
+  })
+
   it('omits block and logs console.error when extractor throws; error not sent to server', async () => {
     widget = makeWidget()
     widget.setAttribute('signed-context', makeEnvelope({ x: ['boom'] }))
@@ -337,6 +344,217 @@ describe('chatbot-widget client extractors', () => {
     const block = lastSendBody(captured).extractor_blocks[0]
     expect(block.output.endsWith(' [truncated]')).toBe(true)
     expect(new TextEncoder().encode(block.output).byteLength).toBeLessThanOrEqual(16)
+  })
+
+  it('auto-registers the built-in blade-snapshot extractor when allowlisted, capturing marker innerText under its label', async () => {
+    document.body.innerHTML = ''
+    const marker = document.createElement('span')
+    marker.setAttribute('data-chatbot-snapshot', 'article')
+    marker.textContent = 'Hello world'
+    document.body.appendChild(marker)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'q')
+
+    const body = lastSendBody(captured)
+    expect(body.extractor_blocks).toHaveLength(1)
+    expect(body.extractor_blocks[0].name).toBe('blade-snapshot')
+    expect(body.extractor_blocks[0].output).toContain('article')
+    expect(body.extractor_blocks[0].output).toContain('Hello world')
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('replays the same blade-snapshot aggregate on consecutive user turns within one page load', async () => {
+    const encoder = new TextEncoder()
+    globalThis.fetch = vi.fn((url, opts) => {
+      captured.calls.push({ url, opts })
+      let sent = false
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/event-stream' }),
+        body: {
+          getReader: () => ({
+            read: () => {
+              if (sent) return Promise.resolve({ done: true, value: undefined })
+              sent = true
+              return Promise.resolve({ done: false, value: encoder.encode('event: done\ndata: {}\n\n') })
+            },
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      })
+    })
+
+    document.body.innerHTML = ''
+    const marker = document.createElement('span')
+    marker.setAttribute('data-chatbot-snapshot', 'article')
+    marker.textContent = 'Hello world'
+    document.body.appendChild(marker)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'first question')
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    await triggerSend(widget, 'what about the third paragraph?')
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+
+    const sendCalls = captured.calls.filter((c) => c.url === '/chatbot/messages')
+    expect(sendCalls).toHaveLength(2)
+
+    const blockA = JSON.parse(sendCalls[0].opts.body).extractor_blocks
+    const blockB = JSON.parse(sendCalls[1].opts.body).extractor_blocks
+
+    expect(blockA).toHaveLength(1)
+    expect(blockA[0].name).toBe('blade-snapshot')
+    expect(blockA[0].output).toContain('Hello world')
+    expect(blockB).toEqual(blockA)
+  })
+
+  it('concatenates same-label markers in document order under one section', async () => {
+    document.body.innerHTML = ''
+    const a = document.createElement('p')
+    a.setAttribute('data-chatbot-snapshot', 'rows')
+    a.textContent = 'first row'
+    const b = document.createElement('p')
+    b.setAttribute('data-chatbot-snapshot', 'rows')
+    b.textContent = 'second row'
+    const c = document.createElement('p')
+    c.setAttribute('data-chatbot-snapshot', 'rows')
+    c.textContent = 'third row'
+    document.body.append(a, b, c)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'q')
+
+    const output = lastSendBody(captured).extractor_blocks[0].output
+    expect(output).toBe('## rows\n\nfirst row\n\nsecond row\n\nthird row')
+  })
+
+  it('emits separate sections for distinct labels with the documented divider shape', async () => {
+    // Divider contract: sections are joined by '\n\n' and each section is '## <label>\n\n<body>'.
+    // Changing the divider should require updating this test, not just passing it.
+    document.body.innerHTML = ''
+    const a = document.createElement('p')
+    a.setAttribute('data-chatbot-snapshot', 'article')
+    a.textContent = 'body text'
+    const b = document.createElement('p')
+    b.setAttribute('data-chatbot-snapshot', 'sidebar')
+    b.textContent = 'aside text'
+    document.body.append(a, b)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'q')
+
+    const output = lastSendBody(captured).extractor_blocks[0].output
+    expect(output).toBe('## article\n\nbody text\n\n## sidebar\n\naside text')
+  })
+
+  it('drops markers with invalid labels (warn) while keeping valid labels in the same DOM', async () => {
+    document.body.innerHTML = ''
+    const bad = document.createElement('p')
+    bad.setAttribute('data-chatbot-snapshot', 'Bad Label!')
+    bad.textContent = 'should be dropped'
+    const good = document.createElement('p')
+    good.setAttribute('data-chatbot-snapshot', 'article')
+    good.textContent = 'keep me'
+    document.body.append(bad, good)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'q')
+
+    const output = lastSendBody(captured).extractor_blocks[0].output
+    expect(output).toBe('## article\n\nkeep me')
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Bad Label!'))
+  })
+
+  it('reads innerText (not textContent) so display:none content is excluded by the browser', async () => {
+    // jsdom does not compute layout, so display:none is not actually excluded by its innerText.
+    // We assert the contract by giving innerText and textContent divergent values and verifying
+    // the impl picks innerText — which is what gives display:none semantics in real browsers.
+    document.body.innerHTML = ''
+    const marker = document.createElement('div')
+    marker.setAttribute('data-chatbot-snapshot', 'article')
+    marker.textContent = 'visible hidden-secret'
+    Object.defineProperty(marker, 'innerText', {
+      configurable: true,
+      get: () => 'visible',
+    })
+    document.body.appendChild(marker)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'q')
+
+    const output = lastSendBody(captured).extractor_blocks[0].output
+    expect(output).toBe('## article\n\nvisible')
+    expect(output).not.toContain('hidden-secret')
+  })
+
+  it('does not auto-register blade-snapshot when not in the allowlist', async () => {
+    document.body.innerHTML = ''
+    const marker = document.createElement('span')
+    marker.setAttribute('data-chatbot-snapshot', 'article')
+    marker.textContent = 'Hello world'
+    document.body.appendChild(marker)
+
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: [] }))
+
+    await triggerSend(widget, 'q')
+
+    expect(lastSendBody(captured)?.extractor_blocks).toBeUndefined()
+  })
+
+  it('omits the blade-snapshot block when no markers are in the DOM', async () => {
+    document.body.innerHTML = ''
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await triggerSend(widget, 'q')
+
+    expect(lastSendBody(captured)?.extractor_blocks).toBeUndefined()
+  })
+
+  it('fires a loud blade-snapshot-specific error when allowlisted but the built-in did not register (bundle mismatch)', async () => {
+    const { ChatbotWidget } = await import('./chatbot-widget.js')
+    const spy = vi.spyOn(ChatbotWidget.prototype, '_registerBuiltinExtractors').mockImplementation(() => {})
+
+    try {
+      widget = makeWidget()
+      widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const messages = errorSpy.mock.calls.map((c) => String(c[0]))
+      const specific = messages.find((m) => m.includes('blade-snapshot') && (m.includes('built-in') || m.includes('bundle')))
+      expect(specific, `expected a blade-snapshot-specific built-in/bundle error; got: ${JSON.stringify(messages)}`).toBeDefined()
+      const generic = messages.find((m) => m.includes('blade-snapshot') && m.includes('has no matching JS registration'))
+      expect(generic, 'generic mismatch warning must not duplicate the blade-snapshot-specific one').toBeUndefined()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('does not fire the missing-registration error for blade-snapshot at boot', async () => {
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['blade-snapshot'] }))
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('blade-snapshot'))
   })
 
   it('silently ignores JS registration of a name not in the allowlist', async () => {

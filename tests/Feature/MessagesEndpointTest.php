@@ -183,6 +183,43 @@ it('truncates extractor output using the envelope size-cap override', function (
     });
 });
 
+it('truncates an oversized blade-snapshot block using the envelope size cap and the existing [truncated] marker', function (): void {
+    $fake = Chatbot::fake()->respondWithStream(['ok']);
+
+    $envelope = app(ContextEnvelope::class)->mint(
+        payload: [],
+        userId: null,
+        route: 'orders.show',
+        channel: 'default',
+        expiresAt: (new DateTimeImmutable)->modify('+5 minutes'),
+        allowedExtractors: ['blade-snapshot'],
+        extractorSizeCapBytes: 16,
+    );
+
+    $response = $this->postJson('/chatbot/messages', [
+        'signed_context' => $envelope,
+        'message' => 'summarise the page',
+        'extractor_blocks' => [
+            ['name' => 'blade-snapshot', 'output' => str_repeat('y', 200)],
+        ],
+    ])->assertOk();
+
+    streamAll($response);
+
+    $fake->assertSentPrompt(function (array $messages): bool {
+        $user = '';
+        foreach ($messages as $m) {
+            if (($m['role'] ?? null) === 'user') {
+                $user = $m['content'] ?? '';
+            }
+        }
+
+        return str_contains($user, '<client-extractor name="blade-snapshot" trust="untrusted-page-content">')
+            && str_contains($user, str_repeat('y', 16).'[truncated]')
+            && ! str_contains($user, str_repeat('y', 17));
+    });
+});
+
 it('rejects inbound extractor blocks whose name is not in the signed allowlist', function (): void {
     Chatbot::fake()->respondWithStream(['ok']);
 

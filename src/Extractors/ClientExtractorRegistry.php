@@ -8,6 +8,10 @@ final class ClientExtractorRegistry
 {
     private const NAME_PATTERN = '/^[a-z][a-z0-9_-]*$/';
 
+    private const RESERVED_NAMES = [
+        'blade-snapshot',
+    ];
+
     private const IDENTITY_SHAPED_NAMES = [
         'userid', 'user',
         'actorid',
@@ -25,6 +29,12 @@ final class ClientExtractorRegistry
         if (! preg_match(self::NAME_PATTERN, $name)) {
             throw new \RuntimeException(
                 "Client extractor name '{$name}' is invalid: must start with a lowercase letter and contain only lowercase letters, digits, hyphens, or underscores.",
+            );
+        }
+
+        if (in_array($name, self::RESERVED_NAMES, true)) {
+            throw new \RuntimeException(
+                "Client extractor name '{$name}' is reserved and cannot be registered by hosts.",
             );
         }
 

@@ -41,6 +41,16 @@ it('rejects a block whose name is not in the allowlist', function (): void {
     );
 })->throws(RuntimeException::class);
 
+it('rejects a blade-snapshot block from a channel that does not allowlist it', function (): void {
+    $payload = new ClientExtractorPayload;
+
+    $payload->normalise(
+        raw: [['name' => 'blade-snapshot', 'output' => '## article\n\nbody']],
+        allowedExtractors: ['article'],
+        registry: makeRegistry(),
+    );
+})->throws(RuntimeException::class);
+
 it('accepts a block whose name is in the allowlist', function (): void {
     $payload = new ClientExtractorPayload;
 

@@ -216,6 +216,17 @@ class ChatbotWidget extends HTMLElement {
   }
 
   registerClientExtractor(name, fn, options = {}) {
+    if (ChatbotWidget.#RESERVED_EXTRACTOR_NAMES.includes(name)) {
+      throw new Error(
+        `Client extractor name '${name}' is reserved and cannot be registered by hosts.`,
+      )
+    }
+    this.#registerInternalExtractor(name, fn, options)
+  }
+
+  static #RESERVED_EXTRACTOR_NAMES = ['blade-snapshot']
+
+  #registerInternalExtractor(name, fn, options = {}) {
     this.#extractors.set(name, { fn, description: options.description })
   }
 
@@ -228,17 +239,62 @@ class ChatbotWidget extends HTMLElement {
     this.#restoreState()
     this.#loadHistory()
     this.addEventListener('tool_started', (e) => this.#showToolStatus(e.detail.name))
-    queueMicrotask(() => this.#bootAllowlistCheck())
+    queueMicrotask(() => {
+      this._registerBuiltinExtractors()
+      this.#bootAllowlistCheck()
+    })
+  }
+
+  _registerBuiltinExtractors() {
+    const allowed = this.#allowedExtractors(this.getAttribute('signed-context'))
+    if (allowed.includes('blade-snapshot') && !this.#extractors.has('blade-snapshot')) {
+      this.#registerInternalExtractor(
+        'blade-snapshot',
+        () => this.#captureBladeSnapshot(),
+        { description: 'Page snapshot' },
+      )
+    }
+  }
+
+  #captureBladeSnapshot() {
+    const markers = document.querySelectorAll('[data-chatbot-snapshot]')
+    if (markers.length === 0) return ''
+
+    const groups = new Map()
+    const order = []
+    const labelPattern = /^[a-z][a-z0-9_-]*$/
+    for (const el of markers) {
+      const label = el.getAttribute('data-chatbot-snapshot') ?? ''
+      if (!labelPattern.test(label)) {
+        console.warn(`@chatbotSnapshot label '${label}' is invalid; section dropped.`)
+        continue
+      }
+      const text = (el.innerText ?? el.textContent ?? '').trim()
+      if (!text) continue
+      if (!groups.has(label)) {
+        groups.set(label, [])
+        order.push(label)
+      }
+      groups.get(label).push(text)
+    }
+
+    const sections = order.map((label) => `## ${label}\n\n${groups.get(label).join('\n\n')}`)
+    return sections.join('\n\n')
   }
 
   #bootAllowlistCheck() {
     const allowed = this.#allowedExtractors(this.getAttribute('signed-context'))
     for (const name of allowed) {
-      if (!this.#extractors.has(name)) {
+      if (this.#extractors.has(name)) continue
+      if (ChatbotWidget.#RESERVED_EXTRACTOR_NAMES.includes(name)) {
         console.error(
-          `Client extractor '${name}' is in the signed allowlist but has no matching JS registration on the widget.`
+          `Built-in client extractor '${name}' is in the signed allowlist but was not registered at boot — likely a widget bundle mismatch after an upgrade. Page content for '${name}' will not be sent.`
         )
+        continue
       }
+      console.error(
+        `Client extractor '${name}' is in the signed allowlist but has no matching JS registration on the widget.`
+      )
     }
   }
 
@@ -593,6 +649,7 @@ class ChatbotWidget extends HTMLElement {
   async #runExtractors(envelope) {
     const allowed = this.#allowedExtractors(envelope)
     if (allowed.length === 0) return []
+    this._registerBuiltinExtractors()
 
     const body = this.#envelopeBody(envelope)
     const timeoutMs = Number.isInteger(body.xt) && body.xt > 0 ? body.xt : 250

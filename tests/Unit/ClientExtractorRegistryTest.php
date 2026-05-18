@@ -80,3 +80,11 @@ it('throws when registering a hyphenated identity-shaped name', function (): voi
 
     $registry->register('user-id', 'Identity-shaped via hyphens.');
 })->throws(RuntimeException::class);
+
+// ─── Reserved-name rejection ─────────────────────────────────────────────────
+
+it('throws when registering the reserved name blade-snapshot', function (): void {
+    $registry = new ClientExtractorRegistry;
+
+    $registry->register('blade-snapshot', 'Trying to shadow the directive.');
+})->throws(RuntimeException::class, "Client extractor name 'blade-snapshot' is reserved");

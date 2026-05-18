@@ -1,5 +1,12 @@
 # Upgrade guide
 
+## Unreleased — Reserved [[client-extractor]] name: `blade-snapshot`
+
+The extractor name `blade-snapshot` is now reserved by the package for the
+`@chatbotSnapshot` Blade directive. Registering an extractor under that name
+(PHP-side or JS-side) throws. See
+[ADR-0005](docs/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline.md).
+
 ## Unreleased — `ChatbotTool` contract: threaded actor is a parameter
 
 The threaded actor has been promoted from a property on `ToolInvocation` to a

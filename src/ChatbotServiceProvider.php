@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Aanfarhan\Chatbot;
 
+use Aanfarhan\Chatbot\Blade\BladeSnapshotCompiler;
 use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Clients\OpenAiCompatibleClient;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
@@ -116,5 +117,9 @@ final class ChatbotServiceProvider extends ServiceProvider
 
             return '<?php echo \\'.ChatbotFacade::class."::channel({$arg})->renderWidget(); ?>";
         });
+
+        $snapshotCompiler = new BladeSnapshotCompiler;
+        Blade::directive('chatbotSnapshot', fn (string $expression): string => $snapshotCompiler->open($expression));
+        Blade::directive('endChatbotSnapshot', fn (string $expression): string => $snapshotCompiler->close());
     }
 }

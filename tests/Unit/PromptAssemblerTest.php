@@ -336,6 +336,55 @@ it('omits the extractor framing rule when no extractors are allowed', function (
     expect($messages[0]['content'])->not->toContain('untrusted material extracted from the user\'s current web page');
 });
 
+it('wraps a blade-snapshot extractor result identically to any other extractor (no special-case branch)', function (): void {
+    $assembler = new PromptAssembler;
+
+    $messages = $assembler->assemble(
+        channelConfig: [],
+        routeOverrides: [],
+        contextPayload: [],
+        history: [],
+        userMessage: 'What is on the page?',
+        allowedExtractors: ['blade-snapshot'],
+        extractorResults: ['blade-snapshot' => "## article\n\nThe order total is 42 dollars."],
+    );
+
+    $user = $messages[array_key_last($messages)]['content'];
+
+    expect($user)->toContain('<client-extractor name="blade-snapshot" trust="untrusted-page-content">')
+        ->toContain('The order total is 42 dollars.')
+        ->toContain('</client-extractor>');
+});
+
+it('strips a blade-snapshot block from historical user messages on the next turn', function (): void {
+    $assembler = new PromptAssembler;
+
+    $history = [
+        [
+            'role' => 'user',
+            'content' => "What is the total?\n\n<client-extractor name=\"blade-snapshot\" trust=\"untrusted-page-content\">\n## article\n\nThe order total is 42 dollars.\n</client-extractor>",
+        ],
+        ['role' => 'assistant', 'content' => '42 dollars.'],
+    ];
+
+    $messages = $assembler->assemble(
+        channelConfig: [],
+        routeOverrides: [],
+        contextPayload: [],
+        history: $history,
+        userMessage: 'What about the third paragraph?',
+        allowedExtractors: ['blade-snapshot'],
+        extractorResults: ['blade-snapshot' => "## article\n\nFresh page content."],
+    );
+
+    $historicalUser = $messages[1];
+
+    expect($historicalUser['role'])->toBe('user')
+        ->and($historicalUser['content'])->toBe('What is the total?')
+        ->and($historicalUser['content'])->not->toContain('<client-extractor')
+        ->and($historicalUser['content'])->not->toContain('The order total is 42 dollars.');
+});
+
 it('strips extractor blocks from historical user messages on replay', function (): void {
     $assembler = new PromptAssembler;
 
