@@ -34,6 +34,7 @@ This package mediates between a host Laravel application and a third-party LLM. 
 | Gap | Notes |
 |---|---|
 | Sophisticated prompt injection | Multi-turn, encoded, or indirect injection (e.g. instructions embedded in a user's order notes) is not detected or blocked. |
+| Indirect prompt injection via client extractors | When a channel allowlists [[client-extractor]]s, untrusted page content (DOM text, customer notes, third-party widgets on the host page) reaches the LLM on every user turn. The package wraps each extractor block in delimited `<client-extractor>` tags and prepends a system-prompt rule instructing the model to treat the contents as data, not instructions (see ADR-0004). This is a soft defence — modern frontier models follow it well, but a determined indirect injection combined with a mutating tool on the same channel's allowlist can still succeed. Hosts must weigh the extractor allowlist against the tool allowlist on each channel. |
 | Post-render content drift | The DOMPurify pass runs at insertion time; dynamic DOM mutations after render are outside the component's control. |
 | Base64-encoded or obfuscated payloads | The sanitizer operates on plaintext strings; it does not decode or classify encoded content. |
 | Two-pass content classification | No secondary classifier runs on LLM output to detect policy violations before display. |

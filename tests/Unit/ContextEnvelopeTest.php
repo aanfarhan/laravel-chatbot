@@ -132,6 +132,39 @@ it('rejects a token minted for channel A when posted to channel B', function ():
     $envelope->verify($token, expected: ['channel' => 'admin']);
 })->throws(MismatchedEnvelopeException::class);
 
+it('round-trips allowedExtractors through mint and verify', function (): void {
+    $envelope = app(ContextEnvelope::class);
+
+    $token = $envelope->mint(
+        payload: [],
+        userId: '1',
+        route: 'r',
+        channel: 'default',
+        expiresAt: new DateTimeImmutable('+1 minute'),
+        allowedExtractors: ['article', 'selection'],
+    );
+
+    $verified = $envelope->verify($token);
+
+    expect($verified->allowedExtractors)->toBe(['article', 'selection']);
+});
+
+it('defaults allowedExtractors to an empty list when not minted', function (): void {
+    $envelope = app(ContextEnvelope::class);
+
+    $token = $envelope->mint(
+        payload: [],
+        userId: '1',
+        route: 'r',
+        channel: 'default',
+        expiresAt: new DateTimeImmutable('+1 minute'),
+    );
+
+    $verified = $envelope->verify($token);
+
+    expect($verified->allowedExtractors)->toBe([]);
+});
+
 it('rejects a token whose version does not match the current version', function (): void {
     $envelope = app(ContextEnvelope::class);
 

@@ -22,6 +22,7 @@ final class ContextEnvelope
     /**
      * @param  array<string, mixed>  $payload
      * @param  list<string>  $allowedTools
+     * @param  list<string>  $allowedExtractors
      */
     public function mint(
         array $payload,
@@ -33,6 +34,7 @@ final class ContextEnvelope
         ?string $prompt = null,
         ?string $summary = null,
         array $allowedTools = [],
+        array $allowedExtractors = [],
     ): string {
         $body = [
             'v' => self::VERSION,
@@ -54,6 +56,9 @@ final class ContextEnvelope
         }
         if ($allowedTools !== []) {
             $body['t'] = $allowedTools;
+        }
+        if ($allowedExtractors !== []) {
+            $body['x'] = $allowedExtractors;
         }
 
         $encoded = $this->base64UrlEncode(
@@ -128,6 +133,10 @@ final class ContextEnvelope
         /** @var list<string> $allowedTools */
         $allowedTools = array_values(array_filter($rawTools, 'is_string'));
 
+        $rawExtractors = isset($body['x']) && is_array($body['x']) ? $body['x'] : [];
+        /** @var list<string> $allowedExtractors */
+        $allowedExtractors = array_values(array_filter($rawExtractors, 'is_string'));
+
         return new Envelope(
             payload: $payload,
             userId: $body['u'],
@@ -139,6 +148,7 @@ final class ContextEnvelope
             prompt: $prompt,
             summary: $summary,
             allowedTools: $allowedTools,
+            allowedExtractors: $allowedExtractors,
         );
     }
 

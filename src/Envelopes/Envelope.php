@@ -11,6 +11,7 @@ final readonly class Envelope
     /**
      * @param  array<string, mixed>  $payload
      * @param  list<string>  $allowedTools
+     * @param  list<string>  $allowedExtractors
      */
     public function __construct(
         public array $payload,
@@ -23,5 +24,6 @@ final readonly class Envelope
         public ?string $prompt = null,
         public ?string $summary = null,
         public array $allowedTools = [],
+        public array $allowedExtractors = [],
     ) {}
 }
