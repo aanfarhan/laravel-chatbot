@@ -35,6 +35,8 @@ final class ContextEnvelope
         ?string $summary = null,
         array $allowedTools = [],
         array $allowedExtractors = [],
+        ?int $extractorTimeoutMs = null,
+        ?int $extractorSizeCapBytes = null,
     ): string {
         $body = [
             'v' => self::VERSION,
@@ -59,6 +61,12 @@ final class ContextEnvelope
         }
         if ($allowedExtractors !== []) {
             $body['x'] = $allowedExtractors;
+        }
+        if ($extractorTimeoutMs !== null) {
+            $body['xt'] = $extractorTimeoutMs;
+        }
+        if ($extractorSizeCapBytes !== null) {
+            $body['xc'] = $extractorSizeCapBytes;
         }
 
         $encoded = $this->base64UrlEncode(
@@ -137,6 +145,9 @@ final class ContextEnvelope
         /** @var list<string> $allowedExtractors */
         $allowedExtractors = array_values(array_filter($rawExtractors, 'is_string'));
 
+        $extractorTimeoutMs = isset($body['xt']) && is_int($body['xt']) ? $body['xt'] : null;
+        $extractorSizeCapBytes = isset($body['xc']) && is_int($body['xc']) ? $body['xc'] : null;
+
         return new Envelope(
             payload: $payload,
             userId: $body['u'],
@@ -149,6 +160,8 @@ final class ContextEnvelope
             summary: $summary,
             allowedTools: $allowedTools,
             allowedExtractors: $allowedExtractors,
+            extractorTimeoutMs: $extractorTimeoutMs,
+            extractorSizeCapBytes: $extractorSizeCapBytes,
         );
     }
 

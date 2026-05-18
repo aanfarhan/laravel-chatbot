@@ -147,6 +147,42 @@ it('wraps inbound extractor_blocks into the user message via the signed allowlis
     });
 });
 
+it('truncates extractor output using the envelope size-cap override', function (): void {
+    $fake = Chatbot::fake()->respondWithStream(['ok']);
+
+    $envelope = app(ContextEnvelope::class)->mint(
+        payload: [],
+        userId: null,
+        route: 'orders.show',
+        channel: 'default',
+        expiresAt: (new DateTimeImmutable)->modify('+5 minutes'),
+        allowedExtractors: ['page_title'],
+        extractorSizeCapBytes: 10,
+    );
+
+    $response = $this->postJson('/chatbot/messages', [
+        'signed_context' => $envelope,
+        'message' => 'summarise',
+        'extractor_blocks' => [
+            ['name' => 'page_title', 'output' => str_repeat('x', 50)],
+        ],
+    ])->assertOk();
+
+    streamAll($response);
+
+    $fake->assertSentPrompt(function (array $messages): bool {
+        $user = '';
+        foreach ($messages as $m) {
+            if (($m['role'] ?? null) === 'user') {
+                $user = $m['content'] ?? '';
+            }
+        }
+
+        return str_contains($user, str_repeat('x', 10).'[truncated]')
+            && ! str_contains($user, str_repeat('x', 11));
+    });
+});
+
 it('rejects inbound extractor blocks whose name is not in the signed allowlist', function (): void {
     Chatbot::fake()->respondWithStream(['ok']);
 

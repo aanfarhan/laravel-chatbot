@@ -33,6 +33,34 @@ it('channel() and context() on the same request produce envelopes for different 
         ->and($defaultEnvelope->payload)->toBe(['order' => 1]);
 });
 
+it('renderWidget mints envelope carrying channel extractor overrides from config', function (): void {
+    config()->set('chatbot.channels.articles', [
+        'allowed_extractors' => ['article'],
+        'extractor_timeout_ms' => 1000,
+        'extractor_size_cap_bytes' => 32768,
+    ]);
+
+    $html = Chatbot::channel('articles')->renderWidget();
+
+    preg_match('/signed-context="([^"]+)"/', $html, $m);
+    $envelope = app(ContextEnvelope::class)->verify($m[1], expected: ['channel' => 'articles']);
+
+    expect($envelope->allowedExtractors)->toBe(['article'])
+        ->and($envelope->extractorTimeoutMs)->toBe(1000)
+        ->and($envelope->extractorSizeCapBytes)->toBe(32768);
+});
+
+it('renderWidget omits extractor overrides when channel config is unset', function (): void {
+    $html = Chatbot::channel('plain')->renderWidget();
+
+    preg_match('/signed-context="([^"]+)"/', $html, $m);
+    $envelope = app(ContextEnvelope::class)->verify($m[1]);
+
+    expect($envelope->allowedExtractors)->toBe([])
+        ->and($envelope->extractorTimeoutMs)->toBeNull()
+        ->and($envelope->extractorSizeCapBytes)->toBeNull();
+});
+
 it('ChannelScope::context()->renderWidget() mints envelope with the channel and payload', function (): void {
     $html = Chatbot::channel('admin')
         ->context(['report' => 'q3'])

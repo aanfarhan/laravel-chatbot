@@ -84,8 +84,12 @@ final class MessagesController
         $rawExtractorBlocks = $request->input('extractor_blocks', []);
         $rawExtractorBlocks = is_array($rawExtractorBlocks) ? array_values($rawExtractorBlocks) : [];
 
+        $payloadNormaliser = $verified->extractorSizeCapBytes !== null
+            ? new ClientExtractorPayload(outputSizeCap: $verified->extractorSizeCapBytes)
+            : new ClientExtractorPayload;
+
         try {
-            $extractorResults = (new ClientExtractorPayload)->normalise(
+            $extractorResults = $payloadNormaliser->normalise(
                 $rawExtractorBlocks,
                 $verified->allowedExtractors,
                 app(ClientExtractorRegistry::class),

@@ -25,5 +25,7 @@ final readonly class Envelope
         public ?string $summary = null,
         public array $allowedTools = [],
         public array $allowedExtractors = [],
+        public ?int $extractorTimeoutMs = null,
+        public ?int $extractorSizeCapBytes = null,
     ) {}
 }

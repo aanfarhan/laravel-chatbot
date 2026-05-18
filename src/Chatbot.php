@@ -285,6 +285,18 @@ final class Chatbot
 
         $context = $this->channelContexts[$channel] ?? [];
 
+        $rawAllowed = $config->get("chatbot.channels.{$channel}.allowed_extractors", []);
+        /** @var list<string> $allowedExtractors */
+        $allowedExtractors = is_array($rawAllowed)
+            ? array_values(array_filter($rawAllowed, 'is_string'))
+            : [];
+
+        $rawTimeout = $config->get("chatbot.channels.{$channel}.extractor_timeout_ms");
+        $extractorTimeoutMs = is_int($rawTimeout) ? $rawTimeout : null;
+
+        $rawCap = $config->get("chatbot.channels.{$channel}.extractor_size_cap_bytes");
+        $extractorSizeCapBytes = is_int($rawCap) ? $rawCap : null;
+
         $token = $envelope->mint(
             payload: $context,
             userId: $userId,
@@ -295,6 +307,9 @@ final class Chatbot
             prompt: $this->resolveChannelPrompt($channel),
             summary: $this->resolveChannelSummary($channel),
             allowedTools: $this->resolveChannelAllowlist($channel),
+            allowedExtractors: $allowedExtractors,
+            extractorTimeoutMs: $extractorTimeoutMs,
+            extractorSizeCapBytes: $extractorSizeCapBytes,
         );
 
         return sprintf(

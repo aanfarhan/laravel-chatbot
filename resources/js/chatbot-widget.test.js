@@ -306,6 +306,39 @@ describe('chatbot-widget client extractors', () => {
     expect(widget.shadowRoot.querySelectorAll('[part="extractor-chip"]').length).toBe(0)
   })
 
+  it('honours envelope xt timeout override when running extractors', async () => {
+    vi.useFakeTimers()
+    try {
+      widget = makeWidget()
+      widget.setAttribute('signed-context', makeEnvelope({ x: ['slow'], xt: 1000 }))
+      widget.registerClientExtractor('slow', () => new Promise((r) => setTimeout(() => r('on time'), 500)))
+
+      widget.shadowRoot.querySelector('.input').value = 'q'
+      widget.shadowRoot.querySelector('.send-button').click()
+      await vi.advanceTimersByTimeAsync(700)
+      vi.useRealTimers()
+      for (let i = 0; i < 20; i++) await Promise.resolve()
+    } finally {
+      if (vi.isFakeTimers?.()) vi.useRealTimers()
+    }
+
+    expect(lastSendBody(captured)?.extractor_blocks).toEqual([
+      { name: 'slow', output: 'on time' },
+    ])
+  })
+
+  it('honours envelope xc size-cap override when truncating output', async () => {
+    widget = makeWidget()
+    widget.setAttribute('signed-context', makeEnvelope({ x: ['big'], xc: 16 }))
+    widget.registerClientExtractor('big', () => 'a'.repeat(100))
+
+    await triggerSend(widget, 'q')
+
+    const block = lastSendBody(captured).extractor_blocks[0]
+    expect(block.output.endsWith(' [truncated]')).toBe(true)
+    expect(new TextEncoder().encode(block.output).byteLength).toBeLessThanOrEqual(16)
+  })
+
   it('silently ignores JS registration of a name not in the allowlist', async () => {
     widget = makeWidget()
     widget.setAttribute('signed-context', makeEnvelope({ x: ['only_this'] }))

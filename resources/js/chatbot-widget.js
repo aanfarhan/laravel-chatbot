@@ -585,9 +585,18 @@ class ChatbotWidget extends HTMLElement {
     } catch { return [] }
   }
 
+  #envelopeBody(envelope) {
+    if (!envelope) return {}
+    try { return JSON.parse(atob(envelope.split('.')[1] ?? '')) } catch { return {} }
+  }
+
   async #runExtractors(envelope) {
     const allowed = this.#allowedExtractors(envelope)
     if (allowed.length === 0) return []
+
+    const body = this.#envelopeBody(envelope)
+    const timeoutMs = Number.isInteger(body.xt) && body.xt > 0 ? body.xt : 250
+    const sizeCap = Number.isInteger(body.xc) && body.xc > 0 ? body.xc : 8192
 
     const results = await Promise.all(allowed.map(async (name) => {
       const entry = this.#extractors.get(name)
@@ -596,7 +605,7 @@ class ChatbotWidget extends HTMLElement {
       try {
         const value = await Promise.race([
           Promise.resolve().then(() => fn()),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('__extractor_timeout__')), 250)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('__extractor_timeout__')), timeoutMs)),
         ])
         if (value === null || value === undefined || value === '') {
           console.warn(`Client extractor '${name}' returned empty output; block omitted.`)
@@ -604,14 +613,15 @@ class ChatbotWidget extends HTMLElement {
         }
         let output = String(value)
         const bytes = new TextEncoder().encode(output)
-        if (bytes.byteLength > 8192) {
-          const slice = bytes.slice(0, 8192 - 13) // room for marker
-          output = new TextDecoder('utf-8', { fatal: false }).decode(slice) + ' [truncated]'
+        if (bytes.byteLength > sizeCap) {
+          const marker = ' [truncated]'
+          const slice = bytes.slice(0, Math.max(0, sizeCap - marker.length))
+          output = new TextDecoder('utf-8', { fatal: false }).decode(slice) + marker
         }
         return { name, output }
       } catch (e) {
         if (e && e.message === '__extractor_timeout__') {
-          console.warn(`Client extractor '${name}' exceeded 250ms timeout; block omitted.`)
+          console.warn(`Client extractor '${name}' exceeded ${timeoutMs}ms timeout; block omitted.`)
         } else {
           console.error(`Client extractor '${name}' threw; block omitted.`, e)
         }

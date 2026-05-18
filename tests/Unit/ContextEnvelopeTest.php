@@ -165,6 +165,42 @@ it('defaults allowedExtractors to an empty list when not minted', function (): v
     expect($verified->allowedExtractors)->toBe([]);
 });
 
+it('round-trips per-channel extractor timeout and size-cap overrides', function (): void {
+    $envelope = app(ContextEnvelope::class);
+
+    $token = $envelope->mint(
+        payload: [],
+        userId: '1',
+        route: 'r',
+        channel: 'default',
+        expiresAt: new DateTimeImmutable('+1 minute'),
+        extractorTimeoutMs: 1000,
+        extractorSizeCapBytes: 16384,
+    );
+
+    $verified = $envelope->verify($token);
+
+    expect($verified->extractorTimeoutMs)->toBe(1000)
+        ->and($verified->extractorSizeCapBytes)->toBe(16384);
+});
+
+it('exposes null extractor overrides when none are minted', function (): void {
+    $envelope = app(ContextEnvelope::class);
+
+    $token = $envelope->mint(
+        payload: [],
+        userId: '1',
+        route: 'r',
+        channel: 'default',
+        expiresAt: new DateTimeImmutable('+1 minute'),
+    );
+
+    $verified = $envelope->verify($token);
+
+    expect($verified->extractorTimeoutMs)->toBeNull()
+        ->and($verified->extractorSizeCapBytes)->toBeNull();
+});
+
 it('rejects a token whose version does not match the current version', function (): void {
     $envelope = app(ContextEnvelope::class);
 
