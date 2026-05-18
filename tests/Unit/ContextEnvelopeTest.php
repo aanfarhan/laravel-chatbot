@@ -52,7 +52,8 @@ it('rejects a token whose signature has been tampered with', function (): void {
     );
 
     [$body, $sig] = explode('.', $token);
-    $tampered = $body.'.'.strtr(substr($sig, 0, -1).'a', '+/', '-_');
+    $replacement = $sig[0] === 'A' ? 'B' : 'A';
+    $tampered = $body.'.'.$replacement.substr($sig, 1);
 
     $envelope->verify($tampered);
 })->throws(TamperedEnvelopeException::class);
