@@ -18,6 +18,10 @@ diff config/chatbot.php vendor/aanfarhan/laravel-chatbot/config/chatbot.php
 
 ## Recent breaking changes
 
+### Reserved extractor name: `blade-snapshot`
+
+The extractor name `blade-snapshot` is now reserved by the package for the [`@chatbotSnapshot`](./client-extractors#blade-snapshot-directive) Blade directive. Registering an extractor under that name on either the PHP `ClientExtractorRegistry` or the JS widget registry throws. If you had a host-side extractor by that name, rename it. See [ADR-0005](/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline).
+
 ### Threaded actor → contract parameter
 
 In an early release the `actor` lived on `ToolInvocation`. It has been promoted to a typed first parameter on `ChatbotTool::authorize()` and `ChatbotTool::handle()`. No backwards-compat shim is provided.

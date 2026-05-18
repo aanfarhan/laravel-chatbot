@@ -10,6 +10,7 @@ ADRs are the answer to *"why is it built this way?"* Many of them are surprising
 - [ADR-0002 — Persist tool invocations with a freshness window](/adr/0002-persist-tool-invocations-with-freshness-window)
 - [ADR-0003 — Threaded actor is a contract parameter](/adr/0003-threaded-actor-is-a-contract-parameter)
 - [ADR-0004 — Client extractors: untrusted by construction](/adr/0004-client-extractors-untrusted-by-construction)
+- [ADR-0005 — Blade snapshot rides the client-extractor pipeline](/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline)
 
 ## When a new ADR gets written
 

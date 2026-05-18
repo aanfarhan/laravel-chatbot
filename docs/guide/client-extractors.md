@@ -66,6 +66,37 @@ What's my total with promo NEWUSER?
 
 A system-prompt rule instructs the model to treat the contents as data, not instructions.
 
+## Blade snapshot directive
+
+For "ship a chunk of the rendered view to the LLM" cases — order summaries, article bodies, tabular data interpolated from request-time records — the package ships a paired Blade directive that rides this same pipeline:
+
+```blade
+@chatbotSnapshot('article')
+    <h1>{{ $post->title }}</h1>
+    {!! $post->body_html !!}
+@endChatbotSnapshot
+```
+
+Under the hood the directive is syntactic sugar over a single reserved extractor name, `blade-snapshot`. Hosts opt in per channel by listing that one name — no config edit per directive use:
+
+```php
+'channels' => [
+    'support' => [
+        'allowed_extractors' => ['blade-snapshot', 'form_state'],
+    ],
+],
+```
+
+Mechanics:
+
+- The directive wraps its body in a marker span. A built-in widget extractor reads each marker's `innerText` at send-time and submits the concatenation as the `blade-snapshot` block.
+- The `'label'` argument is **required**; same-label sections inside one page are concatenated in document order. Use it for loops: `@foreach ($rows as $row) @chatbotSnapshot('rows') … @endChatbotSnapshot @endforeach`.
+- Captured content is `innerText`, not HTML — tags stripped, `display:none` respected, whitespace collapsed the way the browser shows it.
+- Same trust posture, size cap, timeout, history-stripping, and transparency chip as a hand-written extractor.
+- The name `blade-snapshot` is reserved: registering an extractor under it on either the PHP `ClientExtractorRegistry` or the JS widget registry throws.
+
+Snapshots freeze at page render. SPA navigations that swap content without a full reload will keep replaying the old snapshot — use a hand-written extractor when live page state matters. See [ADR-0005](/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline) for the full rationale.
+
 ## What makes extractors safe
 
 | Property | Mechanism |
@@ -97,3 +128,4 @@ See [ADR-0004](/adr/0004-client-extractors-untrusted-by-construction) for the ra
 - [Web component reference](/reference/web-component) — full `registerClientExtractor()` signature
 - [Configuration reference](/reference/configuration#channels) — extractor channel keys
 - [ADR-0004](/adr/0004-client-extractors-untrusted-by-construction)
+- [ADR-0005](/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline) — `@chatbotSnapshot` Blade directive

@@ -85,7 +85,7 @@ Named channels override any top-level key. Keys absent from a channel block fall
 | `throttle.per_day` | `chatbot.throttle.per_day` | |
 | `retention_days` | `chatbot.retention_days` | |
 | `allowed_tools` | `[]` | List of tool names callable on this channel. |
-| `allowed_extractors` | `[]` | List of client-extractor names allowed on this channel. |
+| `allowed_extractors` | `[]` | List of client-extractor names allowed on this channel. The name `blade-snapshot` is reserved by the package — listing it enables the [`@chatbotSnapshot`](/guide/client-extractors#blade-snapshot-directive) Blade directive for this channel. |
 | `extractor_timeout_ms` | `250` | Per-extractor timeout in milliseconds. |
 | `extractor_size_cap_bytes` | `8192` | Per-extractor result size cap. |
 
