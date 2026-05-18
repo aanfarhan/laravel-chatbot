@@ -2,6 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'Laravel Chatbot',
+  base: '/laravel-chatbot/',
   description: 'Context-aware chatbot package for Laravel: signed page context, OpenAI-compatible LLMs, streaming SSE, GDPR-friendly persistence.',
   lang: 'en-US',
   cleanUrls: true,
