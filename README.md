@@ -101,6 +101,7 @@ The widget exposes named parts targetable with `::part(...)` from your app's sty
 | `input` | Text input field |
 | `send-button` | Send button |
 | `tool-status` | Transient status chip shown during tool-call execution |
+| `extractor-chip` | Transparency chip listing which client extractors ran on the current turn |
 
 **Example — custom launcher icon size:**
 
@@ -162,6 +163,54 @@ Channel defaults live in `config/chatbot.php`:
     ],
 ],
 ```
+
+---
+
+## Client extractors
+
+Client extractors let the widget pull live data from the host page — form state, selected text, DOM values — and forward it with each user message turn. The LLM receives the extracted content as explicitly delimited, untrusted context, never as instructions.
+
+### Registering an extractor (JavaScript)
+
+Call `registerClientExtractor(name, fn, options)` on the widget element after it is mounted:
+
+```js
+document.querySelector('chatbot-widget')
+    .registerClientExtractor(
+        'form_state',
+        () => {
+            const form = document.getElementById('checkout-form');
+            return form ? new URLSearchParams(new FormData(form)).toString() : '';
+        },
+        { description: 'Checkout form fields' }
+    );
+```
+
+The widget displays a transparency chip — **"Read from page: Checkout form fields"** — after each send so users see what page data was forwarded.
+
+### Allowing extractors per channel (PHP config)
+
+Extractors must be allowlisted in config before the widget will collect or forward them. Any extractor name the widget reports that is not in the signed envelope for that channel is rejected with HTTP 422.
+
+```php
+// config/chatbot.php
+'channels' => [
+    'support' => [
+        'allowed_extractors'      => ['form_state', 'selected_text'],
+        'extractor_timeout_ms'    => 500,    // default: 250 ms per extractor
+        'extractor_size_cap_bytes' => 16384, // default: 8192 bytes per extractor
+    ],
+],
+```
+
+### Security properties
+
+- Each result is wrapped in `<client-extractor name="…" trust="untrusted-page-content">` tags in the assembled prompt.
+- A system-prompt rule instructs the model to treat the contents as data, not instructions (soft defence — see [ADR-0004](docs/adr/0004-client-extractors-untrusted-by-construction.md)).
+- Extractor output is stripped from history replay; stale page snapshots never re-enter the prompt on subsequent turns.
+- Extractor names follow the same identity-arg block as tool parameters — names like `user_id` or `account_id` are rejected at config load time.
+
+See [SECURITY.md](SECURITY.md) for residual risk when combining client extractors with mutating tools on the same channel.
 
 ---
 
@@ -386,13 +435,15 @@ class OrderChatTest extends TestCase
 
 ### Public contract (stable across minor and patch releases)
 
-- `Chatbot` facade method signatures (`context`, `prompt`, `greeting`, `summary`, `channel`, `tools`, `registerTool`, `clearTools`, `fake`, `quota`, `authorize`)
+- `Chatbot` facade method signatures (`context`, `channel`, `tools`, `registerTool`, `clearTools`, `fake`, `quota`, `authorize`, `renderWidget`)
+- `ChannelScope` fluent method signatures (`context`, `prompt`, `greeting`, `summary`, `tools`, `renderWidget`)
 - Config keys in `chatbot.php`
 - SSE event shape: `{type, ...}` with documented fields for `token`, `done`, `error`, `context_summary`, `tool_started`, `tool_finished`, `tool_failed`
 - Signed envelope shape (public payload fields)
 - Web component attributes: `channel`, `position`, `title`
+- Web component method: `registerClientExtractor(name, fn, options)`
 - CSS custom properties: all eight `--chatbot-*` properties listed above
-- CSS parts: all nine named parts listed above
+- CSS parts: all ten named parts listed above
 - Event class names: `ChatbotMessageStarted`, `ChatbotMessageCompleted`, `ChatbotMessageFailed`, `ChatbotSuspiciousContextDetected`
 - Typed exception class hierarchy under `ChatbotException`
 - `ChatbotTool` and `PersistableTool` interface signatures
