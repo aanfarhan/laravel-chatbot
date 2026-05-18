@@ -12,6 +12,8 @@ use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
 use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
+use Aanfarhan\Chatbot\Extractors\ClientExtractorPayload;
+use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
 use Aanfarhan\Chatbot\PromptAssembler;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
@@ -79,6 +81,19 @@ final class MessagesController
 
         $message = $request->string('message')->toString();
 
+        $rawExtractorBlocks = $request->input('extractor_blocks', []);
+        $rawExtractorBlocks = is_array($rawExtractorBlocks) ? array_values($rawExtractorBlocks) : [];
+
+        try {
+            $extractorResults = (new ClientExtractorPayload)->normalise(
+                $rawExtractorBlocks,
+                $verified->allowedExtractors,
+                app(ClientExtractorRegistry::class),
+            );
+        } catch (\RuntimeException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], 422);
+        }
+
         /** @var array<string, mixed> $channelConfig */
         $channelConfig = (array) $this->config->get('chatbot.channels.'.$verified->channel, []);
 
@@ -97,6 +112,8 @@ final class MessagesController
             contextPayload: $sanitizedPayload,
             history: [],
             userMessage: $message,
+            allowedExtractors: $verified->allowedExtractors,
+            extractorResults: $extractorResults,
         );
 
         $this->store->append(

@@ -10,6 +10,7 @@ use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
+use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
 use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
 use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
@@ -29,6 +30,11 @@ final class ChatbotServiceProvider extends ServiceProvider
         $this->app->singleton(Chatbot::class, fn (Application $app): Chatbot => new Chatbot($app));
 
         $this->app->singleton(ToolRegistry::class, fn (Application $app): ToolRegistry => new ToolRegistry($app));
+
+        $this->app->singleton(
+            ClientExtractorRegistry::class,
+            fn (): ClientExtractorRegistry => new ClientExtractorRegistry,
+        );
 
         $this->app->singleton(
             ContextEnvelope::class,

@@ -111,6 +111,65 @@ it('uses the verified envelope payload when calling the LLM', function (): void 
         ->toBe(['order' => ['id' => 7, 'total' => 45]]);
 });
 
+it('wraps inbound extractor_blocks into the user message via the signed allowlist', function (): void {
+    $fake = Chatbot::fake()->respondWithStream(['ok']);
+
+    $envelope = app(ContextEnvelope::class)->mint(
+        payload: [],
+        userId: null,
+        route: 'orders.show',
+        channel: 'default',
+        expiresAt: (new DateTimeImmutable)->modify('+5 minutes'),
+        allowedExtractors: ['page_title'],
+    );
+
+    $response = $this->postJson('/chatbot/messages', [
+        'signed_context' => $envelope,
+        'message' => 'summarise',
+        'extractor_blocks' => [
+            ['name' => 'page_title', 'output' => 'Hello World'],
+        ],
+    ])->assertOk();
+
+    streamAll($response);
+
+    $fake->assertSentPrompt(function (array $messages): bool {
+        $user = '';
+        foreach ($messages as $m) {
+            if (($m['role'] ?? null) === 'user') {
+                $user = $m['content'] ?? '';
+            }
+        }
+
+        return str_contains($user, '<client-extractor name="page_title" trust="untrusted-page-content">')
+            && str_contains($user, 'Hello World')
+            && str_contains($user, '</client-extractor>');
+    });
+});
+
+it('rejects inbound extractor blocks whose name is not in the signed allowlist', function (): void {
+    Chatbot::fake()->respondWithStream(['ok']);
+
+    $envelope = app(ContextEnvelope::class)->mint(
+        payload: [],
+        userId: null,
+        route: 'orders.show',
+        channel: 'default',
+        expiresAt: (new DateTimeImmutable)->modify('+5 minutes'),
+        allowedExtractors: ['page_title'],
+    );
+
+    $response = $this->postJson('/chatbot/messages', [
+        'signed_context' => $envelope,
+        'message' => 'summarise',
+        'extractor_blocks' => [
+            ['name' => 'evil', 'output' => 'pwn'],
+        ],
+    ]);
+
+    $response->assertStatus(422);
+});
+
 it('assembles the context from the envelope into the prompt sent to the LLM', function (): void {
     $fake = Chatbot::fake()->respondWithStream(['ok']);
     $envelope = $this->extractSignedContext($this->get('/orders/7'));
