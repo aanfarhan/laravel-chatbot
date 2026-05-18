@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Illuminate\Support\Facades\Artisan;
 
 // --- Slice 1: tracer bullet ---
 
@@ -76,6 +77,37 @@ it('exits non-zero when --context-json file does not exist', function (): void {
     $this->artisan('chatbot:inspect-prompt', [
         '--route' => 'orders.show',
         '--context-json' => '/tmp/does-not-exist-chatbot-test.json',
+    ])
+        ->assertExitCode(1)
+        ->expectsOutputToContain('not found');
+});
+
+// --- Slice 8: --extractor-json injects extractor blocks ---
+
+it('--extractor-json injects extractor blocks into the assembled prompt', function (): void {
+    $tmpFile = tempnam(sys_get_temp_dir(), 'chatbot_ext_').'.json';
+    file_put_contents($tmpFile, json_encode([
+        ['name' => 'article', 'output' => 'Sample article content for inspection.'],
+    ]));
+
+    Artisan::call('chatbot:inspect-prompt', [
+        '--route' => 'orders.show',
+        '--extractor-json' => $tmpFile,
+        '--allowed-extractors' => 'article',
+    ]);
+
+    $output = Artisan::output();
+
+    expect($output)->toContain('client-extractor')
+        ->and($output)->toContain('Sample article content for inspection.');
+
+    @unlink($tmpFile);
+});
+
+it('exits non-zero when --extractor-json file does not exist', function (): void {
+    $this->artisan('chatbot:inspect-prompt', [
+        '--route' => 'orders.show',
+        '--extractor-json' => '/tmp/does-not-exist-chatbot-ext-test.json',
     ])
         ->assertExitCode(1)
         ->expectsOutputToContain('not found');
