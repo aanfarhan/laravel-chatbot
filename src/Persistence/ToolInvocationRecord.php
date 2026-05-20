@@ -17,6 +17,7 @@ final readonly class ToolInvocationRecord
         public array $arguments,
         public string $result,
         public string $status,
+        public bool $overran,
         public ?string $error,
         public \DateTimeInterface $startedAt,
         public \DateTimeInterface $finishedAt,

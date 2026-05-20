@@ -21,6 +21,7 @@ interface ToolInvocationStore
         ?string $error,
         \DateTimeInterface $startedAt,
         \DateTimeInterface $finishedAt,
+        bool $overran = false,
     ): ToolInvocationRecord;
 
     /**

@@ -23,6 +23,7 @@ final class EloquentToolInvocationStore implements ToolInvocationStore
         ?string $error,
         \DateTimeInterface $startedAt,
         \DateTimeInterface $finishedAt,
+        bool $overran = false,
     ): ToolInvocationRecord {
         $log = ToolInvocationLog::create([
             'conversation_id' => $conversationId,
@@ -31,6 +32,7 @@ final class EloquentToolInvocationStore implements ToolInvocationStore
             'arguments' => $arguments,
             'result' => $result,
             'status' => $status,
+            'overran' => $overran,
             'error' => $error,
             'started_at' => $startedAt,
             'finished_at' => $finishedAt,
@@ -62,6 +64,7 @@ final class EloquentToolInvocationStore implements ToolInvocationStore
             arguments: $log->arguments ?? [],
             result: $log->result,
             status: $log->status,
+            overran: $log->overran,
             error: $log->error,
             startedAt: $log->started_at,
             finishedAt: $log->finished_at,

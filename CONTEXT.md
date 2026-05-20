@@ -34,7 +34,13 @@ The provider-driven cycle within a single user message: model emits `tool_calls`
 A structured SSE event emitted to the frontend during the [[tool-call-loop]] carrying only the tool `name` and lifecycle phase (`started`, `finished`, `failed`). Arguments and results are never sent to the client. The widget renders these as a transient status chip (themable via existing CSS-parts).
 
 ### Tool invocation record
-The persisted trace of a single [[tool-invocation]] — tool name, (optionally redacted) arguments, (optionally redacted) result, timestamp, and the conversation message it belongs to. Stored in its own table (not inlined on `messages`) so tool usage can be queried independently for audit, debugging, and analytics.
+The persisted trace of a single [[tool-invocation]] — tool name, (optionally redacted) arguments, (optionally redacted) result, timestamp, whether it overran its [[advisory-tool-budget]], and the conversation message it belongs to. Stored in its own table (not inlined on `messages`) so tool usage can be queried independently for audit, debugging, and analytics.
+
+### Advisory tool budget
+The per-tool wall-clock duration a [[tool-invocation]] is measured against. **Advisory, not enforcing**: the package runs the tool's handler synchronously and cannot interrupt a blocking call, so it records the duration and an overrun flag on the [[tool-invocation-record]] but always lets a completed result through. Bounding a tool's actual runtime is the host's responsibility (HTTP-client timeouts, query limits, offloading long work to a queue). Global default, configurable. See ADR-0006.
+
+### Stream duration
+The wall-clock budget for LLM token streaming within a single SSE response, measured **excluding** time spent blocked in synchronous [[tool-invocation]] handlers. Guards against a runaway model stream; it does not — and under the [[advisory-tool-budget]] cannot — bound time spent inside tools. The lifetime of a connection that calls slow tools is bounded instead by the tool-call budget (max calls per turn) and host infrastructure limits. See ADR-0006.
 
 ### Freshness window
 The maximum age of a stored [[tool-invocation-record]] for which its result is replayed into the LLM's history on subsequent user turns. Older records are kept for audit but omitted from replay, forcing the model to re-call the tool if it still needs that data. Default 5 minutes; configurable per channel.

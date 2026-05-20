@@ -18,6 +18,7 @@ use Aanfarhan\Chatbot\Responses\StreamChunk;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -43,7 +44,17 @@ final class StreamCoordinator
         private readonly ?LoggerInterface $logger = null,
         private readonly ?ToolRegistry $toolRegistry = null,
         private readonly ?ToolInvocationStore $toolInvocationStore = null,
+        private readonly ?Closure $clock = null,
     ) {}
+
+    /**
+     * Monotonic wall-clock source in seconds. Injectable so timing-dependent
+     * behaviour (the stream budget) is testable without real sleeps.
+     */
+    private function now(): float
+    {
+        return $this->clock !== null ? ($this->clock)() : microtime(true);
+    }
 
     private function argumentValidator(): ToolArgumentValidator
     {
@@ -91,7 +102,7 @@ final class StreamCoordinator
             $actor,
         ): void {
             $this->incrementCounter();
-            $startedAt = microtime(true);
+            $startedAt = $this->now();
             $assembled = '';
             $usage = null;
             $aborted = false;
@@ -122,7 +133,16 @@ final class StreamCoordinator
                 $callsThisTurn = 0;
                 $maxCalls = $toolDefs !== [] ? $this->maxCallsPerTurn() : PHP_INT_MAX;
 
+                // Wall-clock spent blocked in synchronous tool handlers. Excluded from
+                // the stream budget, which measures LLM-streaming time only (ADR-0006).
+                $toolTimeSpent = 0.0;
+
                 while (true) {
+                    // Cut a runaway loop before opening a new LLM round-trip.
+                    if (($this->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
+                        throw new ChatbotTimeoutException('stream duration exceeded');
+                    }
+
                     $iterToolCalls = [];
                     $iterText = '';
 
@@ -132,7 +152,8 @@ final class StreamCoordinator
                             break 2;
                         }
 
-                        if ((microtime(true) - $startedAt) >= $streamDuration) {
+                        // Cut a runaway model stream between chunks.
+                        if (($this->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
                             throw new ChatbotTimeoutException('stream duration exceeded');
                         }
 
@@ -182,6 +203,7 @@ final class StreamCoordinator
                             continue;
                         }
 
+                        $toolStart = $this->now();
                         $loopMessages[] = $this->invokeToolCall(
                             name: $tc['name'],
                             argumentsJson: $tc['arguments'],
@@ -191,6 +213,7 @@ final class StreamCoordinator
                             allowedTools: $allowedTools,
                             actor: $actor,
                         );
+                        $toolTimeSpent += $this->now() - $toolStart;
                         $callsThisTurn++;
                     }
 
@@ -217,7 +240,7 @@ final class StreamCoordinator
                 $this->decrementCounter();
             }
 
-            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+            $durationMs = (int) round(($this->now() - $startedAt) * 1000);
 
             if (! $aborted) {
                 $this->store->append(
@@ -374,22 +397,12 @@ final class StreamCoordinator
                 ];
             }
 
-            $deadline = microtime(true) + $this->defaultTimeout();
+            // The advisory budget is a measurement, not a control-flow gate (ADR-0006):
+            // we run the handler to completion, record whether it overran, and always
+            // feed the real result back to the model.
+            $deadline = $this->now() + $this->defaultTimeout();
             $result = $tool->handle($actor, $invocation);
-
-            if (microtime(true) > $deadline) {
-                $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
-
-                $errorMsg = "[error: tool '{$name}' timed out]";
-                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', 'timed out', $startedAt);
-
-                return [
-                    'role' => 'tool',
-                    'tool_call_id' => $callId,
-                    'name' => $name,
-                    'content' => $errorMsg,
-                ];
-            }
+            $overran = $this->now() > $deadline;
 
             $encoded = is_array($result) ? json_encode($result, JSON_THROW_ON_ERROR) : (string) $result;
 
@@ -399,7 +412,7 @@ final class StreamCoordinator
 
             $this->emit('tool_finished', ['name' => $name, 'phase' => 'finished']);
 
-            $this->persistToolSuccess($tool, $invocation, $conversationId, $name, $args, $result, $encoded, $startedAt);
+            $this->persistToolSuccess($tool, $invocation, $conversationId, $name, $args, $result, $encoded, $startedAt, $overran);
 
             return [
                 'role' => 'tool',
@@ -462,6 +475,7 @@ final class StreamCoordinator
         array|string $rawResult,
         string $encodedResult,
         Carbon $startedAt,
+        bool $overran,
     ): void {
         if ($this->toolInvocationStore === null) {
             return;
@@ -487,6 +501,7 @@ final class StreamCoordinator
             error: null,
             startedAt: $startedAt,
             finishedAt: now(),
+            overran: $overran,
         );
     }
 

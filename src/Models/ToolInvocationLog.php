@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed> $arguments
  * @property string $result
  * @property string $status
+ * @property bool $overran
  * @property string|null $error
  * @property Carbon $started_at
  * @property Carbon $finished_at
@@ -35,6 +36,7 @@ final class ToolInvocationLog extends Model
         'arguments',
         'result',
         'status',
+        'overran',
         'error',
         'started_at',
         'finished_at',
@@ -45,6 +47,7 @@ final class ToolInvocationLog extends Model
     {
         return [
             'arguments' => 'array',
+            'overran' => 'boolean',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

@@ -65,6 +65,127 @@ it('coordinator writes a chatbot_tool_invocations row for a successful invocatio
     expect($records[0]->finishedAt)->not->toBeNull();
 });
 
+// --- Overrun is observability, not control flow (ADR-0006) ---
+
+it('feeds the completed result to the model even when the tool overruns its advisory budget', function (): void {
+    Chatbot::registerTool(LookupOrderTool::class);
+    // A 0s budget means any real handler work overruns it.
+    config()->set('chatbot.tools.default_timeout', 0);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('lookup_order', ['order_id' => 42], 'call_overrun');
+    $fake->respondWithStream(['Order 42 confirmed.']);
+
+    $store = app(ConversationStore::class);
+    $invocationStore = app(ToolInvocationStore::class);
+    $conversation = $store->start('default', null, null);
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+        toolInvocationStore: $invocationStore,
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'What is order 42?']],
+        conversationId: $conversation->id,
+        routeName: 'test',
+        contextHash: 'abc',
+        channel: 'default',
+    )->sendContent();
+    ob_end_clean();
+
+    // The real result is fed back as the role:tool message...
+    $fake->assertSentPrompt(function (array $messages): bool {
+        foreach ($messages as $msg) {
+            if (($msg['role'] ?? '') === 'tool'
+                && str_contains((string) ($msg['content'] ?? ''), 'confirmed')) {
+                return true;
+            }
+        }
+
+        return false;
+    });
+
+    // ...and no "timed out" error string was ever substituted.
+    foreach ($fake->recordedPrompts() as $messages) {
+        foreach ($messages as $msg) {
+            expect((string) ($msg['content'] ?? ''))->not->toContain('timed out');
+        }
+    }
+});
+
+it('flags the tool-invocation record as overran when the handler exceeds its advisory budget', function (): void {
+    Chatbot::registerTool(LookupOrderTool::class);
+    config()->set('chatbot.tools.default_timeout', 0);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('lookup_order', ['order_id' => 42], 'call_overran_true');
+    $fake->respondWithStream(['Done.']);
+
+    $store = app(ConversationStore::class);
+    $invocationStore = app(ToolInvocationStore::class);
+    $conversation = $store->start('default', null, null);
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+        toolInvocationStore: $invocationStore,
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'What is order 42?']],
+        conversationId: $conversation->id,
+        routeName: 'test',
+        contextHash: 'abc',
+    )->sendContent();
+    ob_end_clean();
+
+    $records = $invocationStore->freshFor($conversation->id, 300);
+    expect($records)->toHaveCount(1);
+    expect($records[0]->overran)->toBeTrue();
+});
+
+it('records overran=false for an invocation that completes within its advisory budget', function (): void {
+    Chatbot::registerTool(LookupOrderTool::class);
+    config()->set('chatbot.tools.default_timeout', 10);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('lookup_order', ['order_id' => 7], 'call_overran_false');
+    $fake->respondWithStream(['Done.']);
+
+    $store = app(ConversationStore::class);
+    $invocationStore = app(ToolInvocationStore::class);
+    $conversation = $store->start('default', null, null);
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+        toolInvocationStore: $invocationStore,
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'What is order 7?']],
+        conversationId: $conversation->id,
+        routeName: 'test',
+        contextHash: 'abc',
+    )->sendContent();
+    ob_end_clean();
+
+    $records = $invocationStore->freshFor($conversation->id, 300);
+    expect($records)->toHaveCount(1);
+    expect($records[0]->overran)->toBeFalse();
+});
+
 // --- Persistence on failure ---
 
 it('coordinator writes a status=handler_error row when the handler throws', function (): void {

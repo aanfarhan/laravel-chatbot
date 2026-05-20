@@ -119,6 +119,20 @@ const css = `
   padding: 4px 12px;
   align-self: flex-start;
   max-width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tool-status-spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #6b7280;
+  animation: tool-status-pulse 1s ease-in-out infinite;
+}
+@keyframes tool-status-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
 .message-actions {
   display: flex;
@@ -208,6 +222,9 @@ class ChatbotWidget extends HTMLElement {
   #lastAssistantBubble = null
   #contextSummary = null
   #toolStatusEl = null
+  #toolTimerInterval = null
+  #toolStartedAt = null
+  #toolLabelEl = null
   #extractors = new Map()
 
   constructor() {
@@ -239,6 +256,8 @@ class ChatbotWidget extends HTMLElement {
     this.#restoreState()
     this.#loadHistory()
     this.addEventListener('tool_started', (e) => this.#showToolStatus(e.detail.name))
+    this.addEventListener('tool_finished', () => this.#resolveToolStatus())
+    this.addEventListener('tool_failed', () => this.#resolveToolStatus())
     queueMicrotask(() => {
       this._registerBuiltinExtractors()
       this.#bootAllowlistCheck()
@@ -624,12 +643,47 @@ class ChatbotWidget extends HTMLElement {
 
   #showToolStatus(name) {
     if (!this.#toolStatusEl) return
-    this.#toolStatusEl.textContent = `Working: ${name}…`
+    this.#stopToolTimer()
+
+    this.#toolStatusEl.textContent = ''
+    const spinner = document.createElement('span')
+    spinner.className = 'tool-status-spinner'
+    spinner.setAttribute('aria-hidden', 'true')
+    const label = document.createElement('span')
+    label.className = 'tool-status-label'
+    this.#toolStatusEl.appendChild(spinner)
+    this.#toolStatusEl.appendChild(label)
+    this.#toolLabelEl = label
+
+    this.#toolStartedAt = Date.now()
+    this.#renderToolLabel(name)
+    this.#toolTimerInterval = setInterval(() => this.#renderToolLabel(name), 1000)
     this.#toolStatusEl.removeAttribute('hidden')
+  }
+
+  #renderToolLabel(name) {
+    if (!this.#toolLabelEl || this.#toolStartedAt === null) return
+    const seconds = Math.floor((Date.now() - this.#toolStartedAt) / 1000)
+    const mins = Math.floor(seconds / 60)
+    const secs = String(seconds % 60).padStart(2, '0')
+    this.#toolLabelEl.textContent = `Running ${name}… ${mins}:${secs}`
+  }
+
+  #stopToolTimer() {
+    if (this.#toolTimerInterval !== null) {
+      clearInterval(this.#toolTimerInterval)
+      this.#toolTimerInterval = null
+    }
+  }
+
+  #resolveToolStatus() {
+    this.#stopToolTimer()
   }
 
   #hideToolStatus() {
     if (!this.#toolStatusEl) return
+    this.#stopToolTimer()
+    this.#toolStartedAt = null
     this.#toolStatusEl.setAttribute('hidden', '')
   }
 

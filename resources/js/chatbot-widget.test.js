@@ -90,6 +90,64 @@ describe('chatbot-widget tool-status chip', () => {
     expect(chip.hidden).toBe(false)
     expect(chip.textContent).toContain('search_products')
   })
+
+  it('shows an animated state and a client-computed elapsed timer that ticks up while in flight', () => {
+    vi.useFakeTimers()
+    try {
+      dispatchToolEvent(widget, 'tool_started', 'lookup_order', 'started')
+
+      const chip = widget.shadowRoot.querySelector('[part="tool-status"]')
+      expect(chip.querySelector('.tool-status-spinner')).not.toBeNull()
+      expect(chip.textContent).toContain('0:00')
+
+      vi.advanceTimersByTime(42_000)
+      expect(chip.textContent).toContain('0:42')
+
+      vi.advanceTimersByTime(60_000)
+      expect(chip.textContent).toContain('1:42')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops the elapsed timer on tool_finished (frozen value, still visible)', () => {
+    vi.useFakeTimers()
+    try {
+      dispatchToolEvent(widget, 'tool_started', 'lookup_order', 'started')
+      vi.advanceTimersByTime(5_000)
+
+      const chip = widget.shadowRoot.querySelector('[part="tool-status"]')
+      expect(chip.textContent).toContain('0:05')
+
+      dispatchToolEvent(widget, 'tool_finished', 'lookup_order', 'finished')
+      vi.advanceTimersByTime(30_000)
+
+      expect(chip.hidden).toBe(false)
+      expect(chip.textContent).toContain('0:05')
+      expect(chip.textContent).not.toContain('0:35')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops the elapsed timer on tool_failed (frozen value, still visible)', () => {
+    vi.useFakeTimers()
+    try {
+      dispatchToolEvent(widget, 'tool_started', 'lookup_order', 'started')
+      vi.advanceTimersByTime(3_000)
+
+      const chip = widget.shadowRoot.querySelector('[part="tool-status"]')
+      expect(chip.textContent).toContain('0:03')
+
+      dispatchToolEvent(widget, 'tool_failed', 'lookup_order', 'failed')
+      vi.advanceTimersByTime(30_000)
+
+      expect(chip.hidden).toBe(false)
+      expect(chip.textContent).toContain('0:03')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('chatbot-widget client extractors', () => {
