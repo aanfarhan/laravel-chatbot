@@ -17,6 +17,7 @@ All keys live in `config/chatbot.php`, published by `php artisan chatbot:install
 | --- | --- | --- | --- |
 | `conversation_ttl` | `CHATBOT_CONVERSATION_TTL` | `86400` | Seconds after which a conversation rolls over to a new id. |
 | `retention_days` | `CHATBOT_RETENTION_DAYS` | `30` | Days after last activity before `chatbot:prune` hard-deletes a conversation. `null` = keep forever. `0` = delete once `conversation_ttl` expires. Per-channel override supported. |
+| `stream_duration` | `CHATBOT_STREAM_DURATION` | `60` | Wall-clock budget (seconds) for **LLM token streaming** within one SSE response, measured _excluding_ time blocked in synchronous tool handlers. Checked between model chunks and before each new LLM round-trip; it does not bound time spent inside a tool. Connection lifetime under slow tools is bounded by `tools.max_calls_per_turn` + host infra limits (`request_terminate_timeout`, proxy read timeouts). See [ADR-0006](/adr/0006-advisory-tool-timeouts-not-hard-interruption). |
 
 ## Rate limiting
 
@@ -40,7 +41,7 @@ Per-IP+channel throttle applied to all chatbot endpoints. Per-channel override s
 | Key | Env | Default | Description |
 | --- | --- | --- | --- |
 | `tools.max_calls_per_turn` | `CHATBOT_TOOLS_MAX_CALLS_PER_TURN` | `5` | Total tool invocations per user message before the budget guard fires. |
-| `tools.default_timeout` | `CHATBOT_TOOLS_DEFAULT_TIMEOUT` | `10` | Per-tool wall-clock timeout in seconds. |
+| `tools.default_timeout` | `CHATBOT_TOOLS_DEFAULT_TIMEOUT` | `10` | **Advisory** per-tool budget in seconds — measured and recorded (the invocation is flagged `overran`), _not_ enforced. The package runs `handle()` synchronously and cannot interrupt a blocking call; a completed result is always used even if it overran. Bound real tool runtime yourself (HTTP-client timeouts, query limits, queue offload). See [ADR-0006](/adr/0006-advisory-tool-timeouts-not-hard-interruption). |
 | `tools.replay_freshness` | `CHATBOT_TOOLS_REPLAY_FRESHNESS` | `300` | Seconds an invocation remains valid for history replay. (Implemented; not yet wired into the request cycle.) |
 | `tools.default_max_arg_length` | `CHATBOT_TOOLS_DEFAULT_MAX_ARG_LENGTH` | `10240` | Max byte length for any single tool string argument. |
 
@@ -104,4 +105,3 @@ The following keys exist but are not part of the public contract — they may ch
 | Key | Notes |
 | --- | --- |
 | `envelope_ttl` | Envelope expiry in seconds (fixed at 900 in v1). Not declared in the published config; overriding requires editing the file directly. |
-| `stream_duration` | SSE wall-clock cap in seconds (default 60). |

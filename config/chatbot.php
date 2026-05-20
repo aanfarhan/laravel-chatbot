@@ -10,6 +10,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Stream duration
+    |--------------------------------------------------------------------------
+    | Wall-clock budget (seconds) for LLM token streaming within a single SSE
+    | response. Measured EXCLUDING time spent blocked in synchronous tool
+    | handlers: it is checked between model chunks and before each new LLM
+    | round-trip, so a slow-but-completed tool no longer eats into the model's
+    | budget to answer. It does not — and under advisory tool timeouts cannot —
+    | bound time spent inside a tool. Connection lifetime under slow tools is
+    | bounded instead by tools.max_calls_per_turn plus host infrastructure
+    | limits (request_terminate_timeout, proxy read timeouts).
+    */
+    'stream_duration' => (int) env('CHATBOT_STREAM_DURATION', 60),
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention policy
     |--------------------------------------------------------------------------
     | Days after last activity before chatbot:prune hard-deletes a conversation.
@@ -95,8 +110,12 @@ return [
     | max_calls_per_turn: total tool invocations allowed across all loop
     |   iterations for a single user message. Hitting the cap injects a
     |   synthetic budget-exhausted tool result so the model still produces prose.
-    | default_timeout: per-tool wall-clock timeout in seconds. Individual tools
-    |   may override via ChatbotTool::timeout() once that method is added.
+    | default_timeout: ADVISORY per-tool budget in seconds — measured and
+    |   recorded (the loop flags the invocation as having overran), NOT enforced.
+    |   The package runs handle() synchronously and cannot interrupt a blocking
+    |   call, so it always uses a completed result even if it overran. Bounding
+    |   actual tool runtime is the host's job: set HTTP-client timeouts and query
+    |   limits, and offload long work to a queue rather than a tool. See ADR-0006.
     */
     'tools' => [
         'max_calls_per_turn' => (int) env('CHATBOT_TOOLS_MAX_CALLS_PER_TURN', 5),

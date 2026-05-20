@@ -127,9 +127,23 @@ Knobs (`chatbot.tools.*`):
 | Key | Default | Purpose |
 | --- | --- | --- |
 | `max_calls_per_turn` | `5` | Total invocations across the loop. Hitting the cap injects a synthetic budget-exhausted result so the model still produces prose. |
-| `default_timeout` | `10` | Per-tool wall-clock timeout in seconds. |
+| `default_timeout` | `10` | **Advisory** per-tool budget in seconds — measured and recorded, not enforced. See [Tool execution & timeouts](#tool-execution-timeouts) below. |
 | `default_max_arg_length` | `10240` | Max byte length for any single string argument value. |
 | `replay_freshness` | `300` | How long a stored invocation remains valid for replay into history (currently not wired in — see [Security](./security)). |
+
+## Tool execution & timeouts
+
+Tools run **synchronously inside the SSE request**, on the same process serving the turn. There is no event loop and no sub-process: while `handle()` runs, the request is blocked and the widget freezes — the in-progress tool chip shows a client-computed elapsed timer until the tool finishes.
+
+`default_timeout` is **advisory**. The package measures each `handle()` call against the budget and flags the [tool-invocation record](/reference/tool-invocation) as having `overran`, but it cannot interrupt a blocking PHP call (`pcntl` is unsafe under PHP-FPM, `set_time_limit` doesn't stop blocking I/O). A handler that runs for five minutes blocks the request for five minutes regardless of the setting — and its completed result is **always used**, never discarded. Overrun is a tuning signal, not a control-flow branch.
+
+So **keep tools fast and self-bounded**. Bounding real runtime is the host's responsibility:
+
+- Set timeouts on every HTTP client, database query, and external call your tool makes.
+- Cap result sizes and row counts.
+- Offload genuinely long work to a queue and have the tool return a handle/status rather than waiting.
+
+`chatbot.stream_duration` (default 60s) caps **LLM token streaming only** and explicitly excludes time blocked in tools, so it cannot rescue you from a slow tool. The real ceiling on a connection that calls slow tools is `max_calls_per_turn` plus your host's infrastructure limits (`request_terminate_timeout`, proxy read timeouts). See [ADR-0006](/adr/0006-advisory-tool-timeouts-not-hard-interruption) for the full rationale.
 
 ## Provider compatibility
 
