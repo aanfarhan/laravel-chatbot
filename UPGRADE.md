@@ -1,13 +1,31 @@
 # Upgrade guide
 
-## Unreleased — Reserved [[client-extractor]] name: `blade-snapshot`
+## 1.3.0 — Tool timeouts are advisory
+
+No code changes required. Tool timeouts became advisory rather than enforced
+(the package never actually interrupted a synchronous tool); see
+[ADR-0006](docs/adr/0006-advisory-tool-timeouts-not-hard-interruption.md).
+
+- Defaults are unchanged and no config key was renamed: `stream_duration`
+  stays 60s, `tools.default_timeout` stays 10s.
+- `chatbot.stream_duration` is now a published config key
+  (`CHATBOT_STREAM_DURATION`). It was already read by the runtime; publishing it
+  only makes it discoverable. It measures **LLM-streaming wall-clock only** and
+  excludes time blocked in synchronous tool handlers.
+- A tool that overruns `tools.default_timeout` is no longer interrupted and its
+  result is no longer discarded — the completed result is always used and the
+  invocation is flagged `overran`. If you relied on `default_timeout` to stop a
+  runaway tool, it never did: add real timeouts inside your handlers
+  (HTTP-client timeouts, query limits) and offload long work to a queue.
+
+## 1.2.2 — Reserved [[client-extractor]] name: `blade-snapshot`
 
 The extractor name `blade-snapshot` is now reserved by the package for the
 `@chatbotSnapshot` Blade directive. Registering an extractor under that name
 (PHP-side or JS-side) throws. See
 [ADR-0005](docs/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline.md).
 
-## Unreleased — `ChatbotTool` contract: threaded actor is a parameter
+## 1.1.4 — `ChatbotTool` contract: threaded actor is a parameter
 
 The threaded actor has been promoted from a property on `ToolInvocation` to a
 typed first parameter on `ChatbotTool::authorize()` and `ChatbotTool::handle()`.
