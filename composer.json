@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "php": "^8.3",
+        "php": "^8.2",
         "guzzlehttp/guzzle": "^7.8",
         "illuminate/contracts": "^11.0 || ^12.0",
         "illuminate/http": "^11.0 || ^12.0",
@@ -49,7 +49,7 @@
     },
     "config": {
         "platform": {
-            "php": "8.3.30"
+            "php": "8.2.0"
         },
         "sort-packages": true,
         "allow-plugins": {

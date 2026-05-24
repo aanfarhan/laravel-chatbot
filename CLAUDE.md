@@ -1,6 +1,6 @@
 ## PHP binary
 
-Use `/Users/farhan/Library/Application Support/Herd/bin/php83` to run PHP commands (tests, artisan, etc.). The system default `php` is 8.2 and will fail platform checks.
+Use `/Users/farhan/Library/Application Support/Herd/bin/php82` to run PHP commands (tests, artisan, etc.). This matches the package's minimum supported version (`php: ^8.2`), so local runs exercise the floor that CI guards. The system default `php` may differ; use the Herd binary explicitly.
 
 ## Code formatting
 

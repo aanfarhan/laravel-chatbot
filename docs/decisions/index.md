@@ -11,6 +11,8 @@ ADRs are the answer to *"why is it built this way?"* Many of them are surprising
 - [ADR-0003 — Threaded actor is a contract parameter](/adr/0003-threaded-actor-is-a-contract-parameter)
 - [ADR-0004 — Client extractors: untrusted by construction](/adr/0004-client-extractors-untrusted-by-construction)
 - [ADR-0005 — Blade snapshot rides the client-extractor pipeline](/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline)
+- [ADR-0006 — Advisory tool timeouts, not hard interruption](/adr/0006-advisory-tool-timeouts-not-hard-interruption)
+- [ADR-0007 — PHP 8.2 is the minimum supported version](/adr/0007-php-82-minimum-for-wider-reach)
 
 ## When a new ADR gets written
 

@@ -6,7 +6,7 @@ A Composer package that drops a context-aware chatbox onto any Laravel page. Dec
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.2+
 - Laravel 11 or 12
 - An OpenAI-compatible LLM provider (OpenAI, Azure, OpenRouter, Groq, Ollama, etc.)
 

@@ -1,5 +1,19 @@
 # Upgrade guide
 
+## 1.4.0 — Minimum PHP lowered to 8.2
+
+No action required. The minimum PHP version dropped from 8.3 to 8.2 to widen
+compatibility — apps still on PHP 8.2 (with Laravel 11 or 12) can now install
+the package. Existing 8.3/8.4 consumers are unaffected.
+
+- This is a strictly more-permissive change, so it ships as a minor release.
+- The package floor is now pinned by the toolchain: `phpstan.neon` sets
+  `phpVersion: 80200`, so any 8.3+ syntax or function (e.g. `json_validate()`,
+  typed class constants) is flagged at analysis time, and CI runs the test
+  suite against 8.2.
+- Raising the floor again later would drop a supported platform and therefore
+  require a major release.
+
 ## 1.3.0 — Tool timeouts are advisory
 
 No code changes required. Tool timeouts became advisory rather than enforced

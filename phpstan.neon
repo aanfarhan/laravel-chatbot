@@ -3,6 +3,7 @@ includes:
 
 parameters:
     level: 9
+    phpVersion: 80200
     paths:
         - src
         - tests/Stubs
