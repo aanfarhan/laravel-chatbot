@@ -4,7 +4,7 @@
 
 Host developers want a "drop it anywhere" way to feed sections of a Laravel view to the LLM: a paired Blade directive (`@chatbotSnapshot('label') … @endChatbotSnapshot`) wrapped around any view fragment, with the rendered content shipped to the model on each user turn. See [[blade-snapshot]] in the glossary.
 
-The directive runs server-side, at page render, which superficially looks like [[context]] (host PHP, signed into the [[context-envelope]], trustworthy by construction). It is not. The fragment being wrapped almost always interpolates request-time data — `{{ $customer->notes }}`, loops over user-generated records, etc. — so its trust posture matches [[client-extractor]] output (ADR-0004), not [[context]].
+The directive runs server-side, at page render, which superficially looks like [[context]] (host PHP, signed into the [[context-envelope]], trustworthy by construction). It is not. The fragment being wrapped almost always interpolates request-time data — <code v-pre>{{ $customer->notes }}</code>, loops over user-generated records, etc. — so its trust posture matches [[client-extractor]] output (ADR-0004), not [[context]].
 
 Two structural problems flow from that:
 
