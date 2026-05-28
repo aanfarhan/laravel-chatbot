@@ -123,6 +123,9 @@ const css = `
   align-items: center;
   gap: 6px;
 }
+.tool-status[hidden] {
+  display: none;
+}
 .tool-status-spinner {
   width: 8px;
   height: 8px;
@@ -134,6 +137,21 @@ const css = `
   0%, 100% { opacity: 0.3; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1.2); }
 }
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #6b7280;
+  animation: tool-status-pulse 1s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
 .message-actions {
   display: flex;
   gap: 4px;
@@ -478,11 +496,13 @@ class ChatbotWidget extends HTMLElement {
     if (btn) btn.disabled = true
 
     const bubble = this.#appendAssistant('')
+    this.#showTypingDots(bubble)
     this.#lastAssistantBubble = bubble
     this.#contextSummary = null
 
     const client = new SSEClient()
     client.addEventListener('chunk', (e) => {
+      this.#removeTypingDots(bubble)
       bubble.dataset.raw = (bubble.dataset.raw ?? '') + e.detail.text
       bubble.innerHTML = this.#renderer.render(bubble.dataset.raw)
     })
@@ -491,6 +511,7 @@ class ChatbotWidget extends HTMLElement {
       summary.textContent = e.detail.text
     })
     client.addEventListener('done', (e) => {
+      this.#removeTypingDots(bubble)
       if (e.detail?.conversationId) {
         localStorage.setItem(CONV_KEY(this.channel), e.detail.conversationId)
       }
@@ -678,6 +699,23 @@ class ChatbotWidget extends HTMLElement {
 
   #resolveToolStatus() {
     this.#stopToolTimer()
+  }
+
+  #showTypingDots(bubble) {
+    const dots = document.createElement('span')
+    dots.className = 'typing-dots'
+    dots.setAttribute('part', 'typing-dots')
+    dots.setAttribute('aria-label', 'Assistant is typing')
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement('span')
+      dot.className = 'typing-dot'
+      dots.appendChild(dot)
+    }
+    bubble.appendChild(dots)
+  }
+
+  #removeTypingDots(bubble) {
+    bubble?.querySelector('.typing-dots')?.remove()
   }
 
   #hideToolStatus() {

@@ -150,6 +150,94 @@ describe('chatbot-widget tool-status chip', () => {
   })
 })
 
+describe('chatbot-widget typing-dots loading indicator', () => {
+  let widget
+  let captured
+  let originalFetch
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    originalFetch = globalThis.fetch
+    captured = setupFetchCapture()
+    if (!Element.prototype.scrollIntoView) {
+      Element.prototype.scrollIntoView = function () {}
+    }
+    widget = makeWidget()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  function streamFetch(chunks) {
+    const encoder = new TextEncoder()
+    let i = 0
+    globalThis.fetch = vi.fn((url, opts) => {
+      captured.calls.push({ url, opts })
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/event-stream' }),
+        body: {
+          getReader: () => ({
+            read: () => {
+              if (i >= chunks.length) return Promise.resolve({ done: true, value: undefined })
+              return Promise.resolve({ done: false, value: encoder.encode(chunks[i++]) })
+            },
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      })
+    })
+  }
+
+  it('renders typing-dots inside the empty assistant bubble immediately on send, before any SSE event', async () => {
+    await triggerSend(widget, 'hello')
+
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble).not.toBeNull()
+    const dots = bubble.querySelector('[part="typing-dots"]')
+    expect(dots).not.toBeNull()
+  })
+
+  it('removes typing-dots on first chunk event', async () => {
+    streamFetch(['event: token\ndata: {"content":"hi"}\n\n'])
+
+    await triggerSend(widget, 'q')
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble.querySelector('[part="typing-dots"]')).toBeNull()
+  })
+
+  it('removes typing-dots on done with no preceding chunks (tool-only turn)', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+
+    await triggerSend(widget, 'q')
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble.querySelector('[part="typing-dots"]')).toBeNull()
+  })
+
+  it('removes typing-dots on error event', async () => {
+    streamFetch(['event: error\ndata: {"code":"network_error","message":"boom","retryable":true}\n\n'])
+
+    await triggerSend(widget, 'q')
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    expect(widget.shadowRoot.querySelector('[part="typing-dots"]')).toBeNull()
+  })
+
+  it('exposes typing-dots via ::part(typing-dots) so hosts can theme it', async () => {
+    await triggerSend(widget, 'q')
+
+    const dots = widget.shadowRoot.querySelector('[part="typing-dots"]')
+    expect(dots).not.toBeNull()
+    expect(dots.getAttribute('part')).toBe('typing-dots')
+  })
+})
+
 describe('chatbot-widget client extractors', () => {
   let widget
   let captured

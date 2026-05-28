@@ -1,0 +1,11 @@
+providers:
+  - Aanfarhan\Chatbot\ChatbotServiceProvider
+
+migrations: true
+
+env:
+  CHATBOT_DEMO: true
+  CHATBOT_PLAYWRIGHT_FIXTURE: true
+  CACHE_STORE: array
+  SESSION_DRIVER: array
+  DB_CONNECTION: sqlite

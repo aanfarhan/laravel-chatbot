@@ -15,6 +15,8 @@ use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
 use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
 use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
+use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
+use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Contracts\Config\Repository;
@@ -67,6 +69,10 @@ final class ChatbotServiceProvider extends ServiceProvider
             /** @var Repository $config */
             $config = $app->make('config');
 
+            if ($config->get('chatbot.playwright_fixture.enabled', false)) {
+                return new PlaywrightFixtureClient;
+            }
+
             if ($config->get('chatbot.demo.enabled', false)) {
                 return (new FakeClient)
                     ->respondWithStream(['Sure! ', 'Order #ORD-1042 ', 'has been shipped ', 'and should arrive ', 'within 2–3 business days.'])
@@ -88,7 +94,10 @@ final class ChatbotServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadRoutesFrom(__DIR__.'/../routes/chatbot.php');
         $this->loadRoutesFrom(__DIR__.'/../routes/chatbot-demo.php');
+        $this->loadRoutesFrom(__DIR__.'/../routes/chatbot-fixture.php');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'chatbot');
+
+        $this->wirePlaywrightFixture();
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -121,5 +130,27 @@ final class ChatbotServiceProvider extends ServiceProvider
         $snapshotCompiler = new BladeSnapshotCompiler;
         Blade::directive('chatbotSnapshot', fn (string $expression): string => $snapshotCompiler->open($expression));
         Blade::directive('endChatbotSnapshot', fn (string $expression): string => $snapshotCompiler->close());
+    }
+
+    /**
+     * Register the Playwright fixture tool + channel allowlist when the flag is on.
+     * Idempotent — safe to call from both boot() (for testbench serve) and the
+     * fixture controller (for Pest tests that toggle the flag post-boot).
+     */
+    public function wirePlaywrightFixture(): void
+    {
+        /** @var Repository $config */
+        $config = $this->app->make('config');
+
+        if (! $config->get('chatbot.playwright_fixture.enabled', false)) {
+            return;
+        }
+
+        $registry = $this->app->make(ToolRegistry::class);
+        if ($registry->resolve('lookup_order') === null) {
+            $registry->register(LookupOrderTool::class);
+        }
+
+        $this->app->make(Chatbot::class)->setChannelAllowlist('playwright', ['lookup_order']);
     }
 }

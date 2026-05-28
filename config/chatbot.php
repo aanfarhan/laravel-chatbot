@@ -144,4 +144,18 @@ return [
     'demo' => [
         'enabled' => (bool) env('CHATBOT_DEMO', false),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Playwright fixture
+    |--------------------------------------------------------------------------
+    | When enabled, the /chatbot/test-fixture route is active, the `playwright`
+    | channel is registered with a `lookup_order` tool, and LLMClient is bound
+    | to a deterministic fake that emits a tool_call → tool_finished → text
+    | sequence. Used only by the package's own Playwright e2e suite — NEVER
+    | enable in production.
+    */
+    'playwright_fixture' => [
+        'enabled' => (bool) env('CHATBOT_PLAYWRIGHT_FIXTURE', false),
+    ],
 ];
