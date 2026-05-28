@@ -73,7 +73,7 @@ final class InspectPromptCommand extends Command
         );
 
         $header = "route={$route}  channel={$channel}";
-        if ($userId !== null && is_string($userId)) {
+        if (is_string($userId) && $userId !== '') {
             $header .= "  user={$userId}";
         }
 

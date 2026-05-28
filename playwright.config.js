@@ -31,7 +31,10 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
+      ...process.env,
+      DB_CONNECTION: 'sqlite',
       DB_DATABASE: DB_PATH,
+      CHATBOT_PLAYWRIGHT_FIXTURE: '1',
     },
   },
   projects: [

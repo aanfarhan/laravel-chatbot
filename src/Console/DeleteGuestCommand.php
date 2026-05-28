@@ -17,8 +17,7 @@ final class DeleteGuestCommand extends Command
 
     public function handle(): int
     {
-        $rawToken = $this->argument('token');
-        $token = is_string($rawToken) ? $rawToken : '';
+        $token = (string) $this->argument('token');
         $hard = (bool) $this->option('hard');
 
         $query = Conversation::where('guest_token', $token);
