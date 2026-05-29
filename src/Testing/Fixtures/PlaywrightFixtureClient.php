@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot\Testing\Fixtures;
 
 use Aanfarhan\Chatbot\Contracts\LLMClient;
+use Aanfarhan\Chatbot\Exceptions\ChatbotContentBlockedException;
+use Aanfarhan\Chatbot\Exceptions\ChatbotException;
+use Aanfarhan\Chatbot\Exceptions\ChatbotProviderException;
+use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
+use Aanfarhan\Chatbot\Exceptions\ChatbotTokenCapExceededException;
 use Aanfarhan\Chatbot\Responses\ChatResponse;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
 
@@ -27,6 +32,14 @@ final class PlaywrightFixtureClient implements LLMClient
 
     public function stream(array $messages, array $tools = [], ?string $model = null): iterable
     {
+        // Deterministic error injection: a user message of `force-error:<code>`
+        // makes the turn throw the matching ChatbotException, so e2e can drive
+        // every error-rendering branch. Gated implicitly — this client only
+        // binds when CHATBOT_PLAYWRIGHT_FIXTURE=1.
+        if (($error = $this->injectedError($messages)) !== null) {
+            throw $error;
+        }
+
         if ($this->offersLookupOrder($tools)) {
             if ($this->hasToolResult($messages)) {
                 yield from $this->finalTextChunks();
@@ -44,6 +57,36 @@ final class PlaywrightFixtureClient implements LLMClient
         }
 
         yield from $this->demoChunks();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $messages
+     */
+    private function injectedError(array $messages): ?ChatbotException
+    {
+        return match ($this->lastUserMessage($messages)) {
+            'force-error:quota_exceeded' => new ChatbotQuotaExceededException('You have reached your daily message limit.'),
+            'force-error:token_cap_exceeded' => new ChatbotTokenCapExceededException('This conversation has reached its token cap.'),
+            'force-error:content_blocked' => new ChatbotContentBlockedException('This message was blocked by content policy.'),
+            'force-error:retryable' => new ChatbotProviderException('The model is temporarily unavailable.', retryable: true),
+            default => null,
+        };
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $messages
+     */
+    private function lastUserMessage(array $messages): ?string
+    {
+        foreach (array_reverse($messages) as $msg) {
+            if (($msg['role'] ?? null) === 'user') {
+                $content = $msg['content'] ?? null;
+
+                return is_string($content) ? $content : null;
+            }
+        }
+
+        return null;
     }
 
     /**
