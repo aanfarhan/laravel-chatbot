@@ -151,6 +151,8 @@ final class ChatbotServiceProvider extends ServiceProvider
             $registry->register(LookupOrderTool::class);
         }
 
-        $this->app->make(Chatbot::class)->setChannelAllowlist('playwright', ['lookup_order']);
+        $chatbot = $this->app->make(Chatbot::class);
+        $chatbot->setChannelAllowlist('playwright', ['lookup_order']);
+        $chatbot->setChannelGreeting('playwright', 'Hi! Ask me about your order.');
     }
 }

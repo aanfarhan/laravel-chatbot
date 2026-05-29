@@ -19,8 +19,9 @@ test.describe('tool-status chip on playwright fixture', () => {
     await expect(chip).toBeVisible()
     await expect(chip).toContainText('lookup_order')
 
-    // assistant text from the second LLM round streams in
-    await expect(widget.locator('.message-assistant')).toContainText('Order ORD-1042')
+    // assistant text from the second LLM round streams in (the first assistant
+    // bubble is the cold-start greeting, so target the latest one)
+    await expect(widget.locator('.message-assistant').last()).toContainText('Order ORD-1042')
 
     await expect(chip).toBeHidden()
   })

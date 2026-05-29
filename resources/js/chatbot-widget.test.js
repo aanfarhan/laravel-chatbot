@@ -10,8 +10,12 @@ function makeWidget() {
 }
 
 function makeEnvelope(body) {
-  const payload = btoa(JSON.stringify(body))
-  return `header.${payload}.signature`
+  // Mirror the real minted token: `base64url(body).base64url(signature)`.
+  const b64 = btoa(JSON.stringify(body))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${b64}.signature`
 }
 
 function setupFetchCapture() {

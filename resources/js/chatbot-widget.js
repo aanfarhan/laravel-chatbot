@@ -434,12 +434,8 @@ class ChatbotWidget extends HTMLElement {
   }
 
   #loadGreeting() {
-    const envelope = this.getAttribute('signed-context')
-    if (!envelope) return
-    try {
-      const payload = JSON.parse(atob(envelope.split('.')[1] ?? ''))
-      if (payload.greeting) this.#appendAssistant(payload.greeting)
-    } catch { /* no greeting */ }
+    const greeting = this.#envelopeBody(this.getAttribute('signed-context')).g
+    if (typeof greeting === 'string' && greeting) this.#appendAssistant(greeting)
   }
 
   async #loadHistory() {
@@ -726,16 +722,22 @@ class ChatbotWidget extends HTMLElement {
   }
 
   #allowedExtractors(envelope) {
-    if (!envelope) return []
-    try {
-      const payload = JSON.parse(atob(envelope.split('.')[1] ?? ''))
-      return Array.isArray(payload.x) ? payload.x : []
-    } catch { return [] }
+    const x = this.#envelopeBody(envelope).x
+    return Array.isArray(x) ? x : []
   }
 
+  // The minted token is `base64url(body).base64url(signature)` — the body is
+  // the first segment, base64url-encoded with compact keys (g, x, xt, xc, …).
   #envelopeBody(envelope) {
     if (!envelope) return {}
-    try { return JSON.parse(atob(envelope.split('.')[1] ?? '')) } catch { return {} }
+    const segment = envelope.split('.')[0]
+    if (!segment) return {}
+    try {
+      let b64 = segment.replace(/-/g, '+').replace(/_/g, '/')
+      b64 += '='.repeat((4 - (b64.length % 4)) % 4)
+      const body = JSON.parse(atob(b64))
+      return body && typeof body === 'object' ? body : {}
+    } catch { return {} }
   }
 
   async #runExtractors(envelope) {
