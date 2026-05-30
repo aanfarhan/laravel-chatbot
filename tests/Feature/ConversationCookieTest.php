@@ -67,9 +67,11 @@ it('reuses the same conversation on the second POST when cookie is carried', fun
     postAndStream($r1);
 
     $conversationId = DB::table('chatbot_conversations')->value('id');
+    $guestId = $r1->getCookie('chatbot_guest_id', decrypt: false)->getValue();
 
     $r2 = $this->withCredentials()
         ->withUnencryptedCookie('chatbot_conversation_default', (string) $conversationId)
+        ->withUnencryptedCookie('chatbot_guest_id', $guestId)
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
             'message' => 'second',
