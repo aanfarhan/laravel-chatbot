@@ -18,5 +18,18 @@
     @endif
 
     @chatbot($channel ?? 'playwright')
+
+    {{-- Lets layout specs mount the widget with a `position` attribute via a
+         query param. Runs synchronously (classic script) before the deferred
+         widget module upgrades the element, so connectedCallback reads it. --}}
+    <script>
+        (function () {
+            var pos = new URLSearchParams(location.search).get('position')
+            var allowed = ['inline', 'bottom-left', 'bottom-right']
+            if (allowed.indexOf(pos) === -1) return
+            var widget = document.querySelector('chatbot-widget')
+            if (widget) widget.setAttribute('position', pos)
+        })()
+    </script>
 </body>
 </html>
