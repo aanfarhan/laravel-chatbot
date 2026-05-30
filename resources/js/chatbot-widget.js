@@ -471,14 +471,14 @@ class ChatbotWidget extends HTMLElement {
     this.#loadGreeting()
   }
 
-  async #send() {
+  async #send(overrideText = null) {
     if (this.#streaming) return
 
     const input = this.#inputEl()
-    const text = input?.value.trim()
+    const text = overrideText ?? input?.value.trim()
     if (!text) return
 
-    input.value = ''
+    if (overrideText === null) input.value = ''
     this.#appendUser(text)
 
     const envelope = this.getAttribute('signed-context')
@@ -594,7 +594,7 @@ class ChatbotWidget extends HTMLElement {
       bubble.dataset.raw = ''
       bubble.innerHTML = ''
       actions.remove()
-      if (this.#lastUserMessage) this.#send()
+      if (this.#lastUserMessage) this.#send(this.#lastUserMessage)
     })
 
     const thumbUp = document.createElement('button')
