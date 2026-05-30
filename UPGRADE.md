@@ -1,5 +1,54 @@
 # Upgrade guide
 
+## Next major — Package routes ship under `web` middleware by default
+
+**Breaking.** Package routes now load under a host-configurable middleware
+group, `chatbot.route_middleware`, defaulting to `['web']`. Previously routes
+loaded bare (no `VerifyCsrfToken`, `StartSession`, or `EncryptCookies`). The
+`web` default makes Laravel's CSRF check a real, independent second barrier on
+top of the signed envelope. See
+[ADR-0009](docs/adr/0009-routes-under-configurable-web-middleware-with-envelope-identity.md)
+for the full rationale.
+
+The version bump itself is a maintainer release decision; this note describes
+the migration regardless of the number it ships under.
+
+### What you must do
+
+- **Render `<meta name="csrf-token">` on any host page that mounts the widget.**
+  With `web` active, `POST /chatbot/messages` is now CSRF-protected. The bundled
+  widget reads the token from that meta tag and sends it as `X-CSRF-TOKEN`. A
+  page that omits the tag gets its `POST` rejected with `419 Page Expired`.
+
+  ```blade
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  ```
+
+### Opt-out
+
+- Set `chatbot.route_middleware => []` to restore the previous middleware-free
+  behavior (no CSRF check, no session, no cookie encryption on package routes).
+  Identity rides the signed envelope on both the read and write paths, so the
+  feature works correctly under any `route_middleware` value, including `[]`.
+
+### One-time cookie reset
+
+- `web` includes `EncryptCookies`. Existing **plaintext** `chatbot_guest_id` and
+  `chatbot_conversation_{channel}` cookies set under the old regime fail to
+  decrypt once the group is active, so Laravel drops them once — a single loss
+  of guest/conversation continuity on upgrade. Set and read are symmetric
+  afterward. This is transparent to the JS client: the conversation id lives in
+  `localStorage` and the guest cookie is `httpOnly` (never read in JS).
+
+### No action required
+
+- **History now scopes by the signed envelope, not the session.**
+  `HistoryController` takes ownership identity from the verified envelope's
+  `userId` (matching `MessagesController`), so a missing or invalid envelope is
+  rejected `403` on both the authenticated and guest branches. This removes a
+  latent coupling on session middleware; no host change is needed. Noted for
+  completeness.
+
 ## 1.4.0 — Minimum PHP lowered to 8.2
 
 No action required. The minimum PHP version dropped from 8.3 to 8.2 to widen
