@@ -511,6 +511,9 @@ class ChatbotWidget extends HTMLElement {
       if (e.detail?.conversationId) {
         localStorage.setItem(CONV_KEY(this.channel), e.detail.conversationId)
       }
+      if (e.detail?.messageId != null) {
+        bubble.dataset.messageId = e.detail.messageId
+      }
       this.#addMessageActions(bubble)
       this.#finishStreaming()
     })

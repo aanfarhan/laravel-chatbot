@@ -46,6 +46,20 @@ describe('SSEClient', () => {
     expect(dones).toEqual([{ usage: { input: 10, output: 5 } }])
   })
 
+  it('surfaces the persisted message id on the done event', async () => {
+    const stream = makeStream(
+      'data: {"type":"done","conversation_id":7,"message_id":42,"usage":{"input":1,"output":2}}',
+      '',
+    )
+    const client = new SSEClient(makeFetch(stream))
+    const dones = []
+    client.addEventListener('done', (e) => dones.push(e.detail))
+
+    await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
+
+    expect(dones[0].messageId).toBe(42)
+  })
+
   it('emits an error event', async () => {
     const stream = makeStream(
       'data: {"type":"error","code":"provider_error","message":"upstream failed","retryable":true}',

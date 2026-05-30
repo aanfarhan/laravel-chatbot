@@ -243,7 +243,7 @@ final class StreamCoordinator
             $durationMs = (int) round(($this->now() - $startedAt) * 1000);
 
             if (! $aborted) {
-                $this->store->append(
+                $messageRecord = $this->store->append(
                     conversationId: $conversationId,
                     role: 'assistant',
                     content: $assembled,
@@ -272,6 +272,7 @@ final class StreamCoordinator
                 } else {
                     $this->emit('done', [
                         'conversation_id' => $conversationId,
+                        'message_id' => $messageRecord->id,
                         'usage' => [
                             'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
                             'output_tokens' => $usage !== null ? $usage->outputTokens : 0,

@@ -224,6 +224,50 @@ describe('chatbot-widget typing-dots loading indicator', () => {
     expect(bubble.querySelector('[part="typing-dots"]')).toBeNull()
   })
 
+  it('sets dataset.messageId on the assistant bubble from the done payload', async () => {
+    streamFetch(['event: done\ndata: {"message_id":42}\n\n'])
+
+    await triggerSend(widget, 'q')
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble.dataset.messageId).toBe('42')
+  })
+
+  it('still completes the turn when done carries no message id (rating stays unavailable)', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+
+    await triggerSend(widget, 'q')
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble.dataset.messageId).toBeUndefined()
+    // action row is appended on done regardless of message id
+    expect(widget.shadowRoot.querySelector('.message-actions')).not.toBeNull()
+  })
+
+  it('posts the rating value to the rate endpoint and disables both buttons once a turn carries a message id', async () => {
+    streamFetch(['event: done\ndata: {"message_id":42}\n\n'])
+
+    await triggerSend(widget, 'q')
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    const actions = widget.shadowRoot.querySelector('.message-actions')
+    const buttons = [...actions.querySelectorAll('button')]
+    const up = buttons.find((b) => b.textContent === '👍')
+    const down = buttons.find((b) => b.textContent === '👎')
+
+    up.click()
+    for (let i = 0; i < 30; i++) await Promise.resolve()
+
+    const rate = captured.calls.find((c) => c.url === '/chatbot/messages/42/rate')
+    expect(rate).toBeTruthy()
+    expect(rate.opts.method).toBe('POST')
+    expect(JSON.parse(rate.opts.body)).toEqual({ value: 1 })
+    expect(up.disabled).toBe(true)
+    expect(down.disabled).toBe(true)
+  })
+
   it('removes typing-dots on error event', async () => {
     streamFetch(['event: error\ndata: {"code":"network_error","message":"boom","retryable":true}\n\n'])
 

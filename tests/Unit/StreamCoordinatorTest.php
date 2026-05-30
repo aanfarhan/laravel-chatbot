@@ -186,3 +186,34 @@ it('emits token events then done for a three-chunk stream', function (): void {
 
     expect($events[3]['event'])->toBe('done');
 });
+
+it('carries the persisted assistant message id on the done event', function (): void {
+    $client = new FakeClient;
+    $client->respondWithStream(['Hi']);
+
+    $store = Mockery::mock(ConversationStore::class);
+    $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
+
+    $config = Mockery::mock(ConfigRepository::class);
+    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
+    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
+
+    $coordinator = new StreamCoordinator($client, $store, $config);
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'hi']],
+        conversationId: 1,
+        routeName: 'test',
+        contextHash: 'abc',
+        isAborted: fn () => false,
+    )->sendContent();
+    $output = (string) ob_get_clean();
+
+    $events = parseSseEvents($output);
+    $done = end($events);
+
+    expect($done['event'])->toBe('done');
+    expect(json_decode($done['data'], true)['message_id'])->toBe(1);
+});

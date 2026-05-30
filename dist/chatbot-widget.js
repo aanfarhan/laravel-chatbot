@@ -60,7 +60,7 @@ Ke = new WeakMap(), me = new WeakMap(), Je = new WeakMap(), Ne = new WeakMap(), 
       this.dispatchEvent(new CustomEvent("chunk", { detail: { text: s.content ?? s.text } }));
       break;
     case "done":
-      this.dispatchEvent(new CustomEvent("done", { detail: { conversationId: s.conversation_id, usage: s.usage } }));
+      this.dispatchEvent(new CustomEvent("done", { detail: { conversationId: s.conversation_id, messageId: s.message_id, usage: s.usage } }));
       break;
     case "error":
       this.dispatchEvent(new CustomEvent("error", {
@@ -2579,8 +2579,8 @@ ${n.get(l).join(`
     const y = d(this, p, vs).call(this, h);
     y.textContent = w.detail.text;
   }), f.addEventListener("done", (w) => {
-    var y;
-    d(this, p, pn).call(this, h), (y = w.detail) != null && y.conversationId && localStorage.setItem(qe(this.channel), w.detail.conversationId), d(this, p, Ls).call(this, h), d(this, p, Et).call(this);
+    var y, I;
+    d(this, p, pn).call(this, h), (y = w.detail) != null && y.conversationId && localStorage.setItem(qe(this.channel), w.detail.conversationId), ((I = w.detail) == null ? void 0 : I.messageId) != null && (h.dataset.messageId = w.detail.messageId), d(this, p, Ls).call(this, h), d(this, p, Et).call(this);
   }), f.addEventListener("tool_started", (w) => this.dispatchEvent(new CustomEvent("tool_started", { detail: w.detail }))), f.addEventListener("tool_finished", (w) => this.dispatchEvent(new CustomEvent("tool_finished", { detail: w.detail }))), f.addEventListener("tool_failed", (w) => this.dispatchEvent(new CustomEvent("tool_failed", { detail: w.detail }))), f.addEventListener("error", (w) => {
     d(this, p, ln).call(this, w.detail, h, s, i, o), d(this, p, Et).call(this);
   });
