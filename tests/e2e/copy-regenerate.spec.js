@@ -31,7 +31,7 @@ async function completeTurn(widget) {
 }
 
 test.describe('copy & regenerate actions on the playwright fixture', () => {
-  test('a completed assistant turn carries the copy / regenerate / rating action row', async ({ page }) => {
+  test('a completed assistant turn carries the copy / regenerate action row and no rating buttons', async ({ page }) => {
     const widget = await openWidget(page)
     await completeTurn(widget)
 
@@ -39,8 +39,8 @@ test.describe('copy & regenerate actions on the playwright fixture', () => {
     await expect(actions).toBeVisible()
     await expect(actions.getByText('📋 Copy')).toBeVisible()
     await expect(actions.getByText('🔄 Regenerate')).toBeVisible()
-    await expect(actions.getByText('👍')).toBeVisible()
-    await expect(actions.getByText('👎')).toBeVisible()
+    await expect(actions.getByText('👍')).toHaveCount(0)
+    await expect(actions.getByText('👎')).toHaveCount(0)
   })
 
   test('Copy places the assistant raw text on the clipboard', async ({ page, context }) => {

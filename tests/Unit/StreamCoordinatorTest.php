@@ -187,7 +187,7 @@ it('emits token events then done for a three-chunk stream', function (): void {
     expect($events[3]['event'])->toBe('done');
 });
 
-it('carries the persisted assistant message id on the done event', function (): void {
+it('persists the assistant message but omits its id from the done event', function (): void {
     $client = new FakeClient;
     $client->respondWithStream(['Hi']);
 
@@ -215,5 +215,5 @@ it('carries the persisted assistant message id on the done event', function (): 
     $done = end($events);
 
     expect($done['event'])->toBe('done');
-    expect(json_decode($done['data'], true)['message_id'])->toBe(1);
+    expect(json_decode($done['data'], true))->not->toHaveKey('message_id');
 });

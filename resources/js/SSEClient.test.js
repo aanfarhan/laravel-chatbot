@@ -46,7 +46,7 @@ describe('SSEClient', () => {
     expect(dones).toEqual([{ usage: { input: 10, output: 5 } }])
   })
 
-  it('surfaces the persisted message id on the done event', async () => {
+  it('does not surface a message id on the done event', async () => {
     const stream = makeStream(
       'data: {"type":"done","conversation_id":7,"message_id":42,"usage":{"input":1,"output":2}}',
       '',
@@ -57,7 +57,8 @@ describe('SSEClient', () => {
 
     await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
 
-    expect(dones[0].messageId).toBe(42)
+    expect(dones[0]).not.toHaveProperty('messageId')
+    expect(dones[0].conversationId).toBe(7)
   })
 
   it('emits an error event', async () => {

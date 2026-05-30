@@ -65,7 +65,7 @@ export class SSEClient extends EventTarget {
         this.dispatchEvent(new CustomEvent('chunk', { detail: { text: payload.content ?? payload.text } }))
         break
       case 'done':
-        this.dispatchEvent(new CustomEvent('done', { detail: { conversationId: payload.conversation_id, messageId: payload.message_id, usage: payload.usage } }))
+        this.dispatchEvent(new CustomEvent('done', { detail: { conversationId: payload.conversation_id, usage: payload.usage } }))
         break
       case 'error':
         this.dispatchEvent(new CustomEvent('error', {

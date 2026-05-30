@@ -511,9 +511,6 @@ class ChatbotWidget extends HTMLElement {
       if (e.detail?.conversationId) {
         localStorage.setItem(CONV_KEY(this.channel), e.detail.conversationId)
       }
-      if (e.detail?.messageId != null) {
-        bubble.dataset.messageId = e.detail.messageId
-      }
       this.#addMessageActions(bubble)
       this.#finishStreaming()
     })
@@ -600,34 +597,8 @@ class ChatbotWidget extends HTMLElement {
       if (this.#lastUserMessage) this.#send(this.#lastUserMessage)
     })
 
-    const thumbUp = document.createElement('button')
-    thumbUp.className = 'action-btn'
-    thumbUp.textContent = '👍'
-    thumbUp.addEventListener('click', () => this.#rate(bubble, 1, thumbUp, thumbDown))
-
-    const thumbDown = document.createElement('button')
-    thumbDown.className = 'action-btn'
-    thumbDown.textContent = '👎'
-    thumbDown.addEventListener('click', () => this.#rate(bubble, -1, thumbUp, thumbDown))
-
-    actions.append(copy, regen, thumbUp, thumbDown)
+    actions.append(copy, regen)
     bubble.parentElement?.insertBefore(actions, bubble.nextSibling)
-  }
-
-  async #rate(bubble, value, upBtn, downBtn) {
-    const messageId = bubble.dataset.messageId
-    if (!messageId) return
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.content
-    await fetch('/chatbot/messages/' + messageId + '/rate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
-      },
-      body: JSON.stringify({ value }),
-    })
-    upBtn.disabled = true
-    downBtn.disabled = true
   }
 
   #handleStreamError(detail, bubble, originalMessage, envelope, conversationId) {
