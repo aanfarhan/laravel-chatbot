@@ -40,7 +40,26 @@ final class PlaywrightFixtureClient implements LLMClient
             throw $error;
         }
 
-        if ($this->offersLookupOrder($tools)) {
+        // `fail-tool` drives the failing-tool branch: emit a call to the tool
+        // whose handler throws, so the loop produces `tool_started` →
+        // `tool_failed`, then stream a final answer on the follow-up round.
+        if ($this->lastUserMessage($messages) === 'fail-tool' && $this->offersTool($tools, 'failing_tool')) {
+            if ($this->hasToolResult($messages)) {
+                yield from $this->finalTextChunks();
+
+                return;
+            }
+
+            yield new StreamChunk('', toolCalls: [[
+                'id' => 'call_fail_1',
+                'name' => 'failing_tool',
+                'arguments' => '{}',
+            ]]);
+
+            return;
+        }
+
+        if ($this->offersTool($tools, 'lookup_order')) {
             if ($this->hasToolResult($messages)) {
                 yield from $this->finalTextChunks();
 
@@ -92,11 +111,11 @@ final class PlaywrightFixtureClient implements LLMClient
     /**
      * @param  list<array<string, mixed>>  $tools
      */
-    private function offersLookupOrder(array $tools): bool
+    private function offersTool(array $tools, string $name): bool
     {
         foreach ($tools as $tool) {
             $fn = is_array($tool['function'] ?? null) ? $tool['function'] : [];
-            if (($fn['name'] ?? null) === 'lookup_order') {
+            if (($fn['name'] ?? null) === $name) {
                 return true;
             }
         }

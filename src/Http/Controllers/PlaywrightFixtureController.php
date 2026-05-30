@@ -7,12 +7,16 @@ namespace Aanfarhan\Chatbot\Http\Controllers;
 use Aanfarhan\Chatbot\ChatbotServiceProvider;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\Factory as ViewFactory;
 
 final class PlaywrightFixtureController
 {
-    public function __invoke(Repository $config, Application $app, ViewFactory $view): Response
+    /** Channels the fixture page is allowed to render. */
+    private const CHANNELS = ['playwright', 'playwright-summary', 'playwright-extractor'];
+
+    public function __invoke(Request $request, Repository $config, Application $app, ViewFactory $view): Response
     {
         if (! $config->get('chatbot.playwright_fixture.enabled', false)) {
             abort(404);
@@ -26,6 +30,11 @@ final class PlaywrightFixtureController
             $provider->wirePlaywrightFixture();
         }
 
-        return response($view->make('chatbot::test-fixture'));
+        $channel = $request->query('channel', 'playwright');
+        if (! in_array($channel, self::CHANNELS, true)) {
+            $channel = 'playwright';
+        }
+
+        return response($view->make('chatbot::test-fixture', ['channel' => $channel]));
     }
 }

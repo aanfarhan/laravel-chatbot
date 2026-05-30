@@ -15,6 +15,7 @@ use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
 use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
 use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
+use Aanfarhan\Chatbot\Testing\Fixtures\FailingTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
@@ -150,9 +151,27 @@ final class ChatbotServiceProvider extends ServiceProvider
         if ($registry->resolve('lookup_order') === null) {
             $registry->register(LookupOrderTool::class);
         }
+        if ($registry->resolve('failing_tool') === null) {
+            $registry->register(FailingTool::class);
+        }
 
         $chatbot = $this->app->make(Chatbot::class);
-        $chatbot->setChannelAllowlist('playwright', ['lookup_order']);
+        $chatbot->setChannelAllowlist('playwright', ['lookup_order', 'failing_tool']);
         $chatbot->setChannelGreeting('playwright', 'Hi! Ask me about your order.');
+
+        // Dedicated channel carrying a context summary in its signed envelope, so
+        // every turn emits a `context_summary` event. Isolated from `playwright`
+        // to keep the other specs' turns summary-free.
+        $chatbot->setChannelAllowlist('playwright-summary', ['lookup_order']);
+        $chatbot->setChannelGreeting('playwright-summary', 'Hi! Ask me about your order.');
+        $chatbot->setChannelSummary('playwright-summary', 'Returning customer — previously asked about ORD-1042.');
+
+        // Dedicated channel whose signed envelope allows the built-in
+        // `blade-snapshot` client extractor, so e2e can drive the page-snapshot
+        // capture end-to-end. No tools — keeps the turn focused on the extractor
+        // path. Isolated from `playwright` so the other specs run extractor-free.
+        $chatbot->setChannelAllowlist('playwright-extractor', []);
+        $chatbot->setChannelGreeting('playwright-extractor', 'Hi! Ask me about your order.');
+        $config->set('chatbot.channels.playwright-extractor.allowed_extractors', ['blade-snapshot']);
     }
 }

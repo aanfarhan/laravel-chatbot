@@ -34,9 +34,21 @@ it('registers the lookup_order tool and playwright channel allowlist when the fi
 
     $registry = $this->app->make(ToolRegistry::class);
     expect($registry->resolve('lookup_order'))->not->toBeNull();
+    expect($registry->resolve('failing_tool'))->not->toBeNull();
 
     $chatbot = $this->app->make(Chatbot::class);
-    expect($chatbot->resolveChannelAllowlist('playwright'))->toBe(['lookup_order']);
+    expect($chatbot->resolveChannelAllowlist('playwright'))->toBe(['lookup_order', 'failing_tool']);
+});
+
+it('allows the blade-snapshot extractor on the playwright-extractor channel and renders its markers', function (): void {
+    config()->set('chatbot.playwright_fixture.enabled', true);
+
+    $this->get('/chatbot/test-fixture?channel=playwright-extractor')
+        ->assertStatus(200)
+        ->assertSee('channel="playwright-extractor"', escape: false)
+        ->assertSee('data-chatbot-snapshot="product"', escape: false);
+
+    expect(config('chatbot.channels.playwright-extractor.allowed_extractors'))->toBe(['blade-snapshot']);
 });
 
 it('returns 404 from /chatbot/test-fixture when the fixture flag is off', function (): void {
