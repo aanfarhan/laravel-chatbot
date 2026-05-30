@@ -1,13 +1,17 @@
 # HTTP endpoints
 
-All routes are registered in `routes/chatbot.php` and prefixed with `/chatbot`. They are part of the [public contract](/guide/semver).
+All routes are registered under `routes/chatbot*.php` and prefixed with `/chatbot`. Routes marked **public contract** are governed by the [semver policy](/guide/semver).
 
-| Method | Path | Name | Controller |
-| --- | --- | --- | --- |
-| `POST` | `/chatbot/messages` | `chatbot.messages` | `MessagesController` |
-| `GET` | `/chatbot/conversations/{id}/messages` | `chatbot.conversations.messages` | `HistoryController` |
-| `GET` | `/chatbot/health` | `chatbot.health` | `HealthController` |
-| `GET` | `/chatbot/widget.js` | `chatbot.widget-js` | _(inline closure)_ |
+| Method | Path | Name | Controller | Notes |
+| --- | --- | --- | --- | --- |
+| `POST` | `/chatbot/messages` | `chatbot.messages` | `MessagesController` | public contract; under `route_middleware` |
+| `GET` | `/chatbot/conversations/{id}/messages` | `chatbot.conversations.messages` | `HistoryController` | public contract; under `route_middleware` |
+| `GET` | `/chatbot/health` | `chatbot.health` | `HealthController` | public contract; no middleware |
+| `GET` | `/chatbot/widget.js` | `chatbot.widget-js` | _(inline closure)_ | public contract; no middleware |
+| `GET` | `/chatbot/demo` | `chatbot.demo` | `DemoController` | active only when `demo.enabled = true`; under `route_middleware` |
+| `GET` | `/chatbot/test-fixture` | `chatbot.playwright-fixture` | `PlaywrightFixtureController` | **internal** — active only when `playwright_fixture.enabled = true`; for the package's own e2e suite |
+
+The `POST /chatbot/messages` and `GET /chatbot/conversations/{id}/messages` routes, plus the conditional render routes (`/chatbot/demo`, `/chatbot/test-fixture`), are wrapped in the [`route_middleware`](./configuration#route-middleware) group (default: `['web']`). `GET /chatbot/health` and `GET /chatbot/widget.js` are always outside that group.
 
 ## `POST /chatbot/messages`
 

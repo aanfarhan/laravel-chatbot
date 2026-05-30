@@ -113,4 +113,11 @@ $this->app->bind(\Aanfarhan\Chatbot\Contracts\LLMClient::class, MyClient::class)
 
 ## `ConversationStore` and `ToolInvocationStore`
 
-The default Eloquent-backed implementations live under `Aanfarhan\Chatbot\Stores`. These interfaces exist so hosts can swap in alternative persistence (e.g., a different database, a queue-based writer). The interface shape is **internal** for v1 — relying on it pins you to a moving target.
+The default Eloquent-backed implementations are `Aanfarhan\Chatbot\Stores\EloquentConversationStore` and `Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore`. These interfaces exist so hosts can swap in alternative persistence (e.g., a different database, a queue-based writer) by rebinding in a service provider:
+
+```php
+$this->app->bind(\Aanfarhan\Chatbot\Contracts\ConversationStore::class, MyConversationStore::class);
+$this->app->bind(\Aanfarhan\Chatbot\Contracts\ToolInvocationStore::class, MyToolInvocationStore::class);
+```
+
+The interface shape is **internal** for v1 — relying on it pins you to a moving target.

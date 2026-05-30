@@ -11,6 +11,12 @@ All keys live in `config/chatbot.php`, published by `php artisan chatbot:install
 | `model` | `CHATBOT_MODEL` | `gpt-4o-mini` | Default model name. Overridable per channel. |
 | `provider.supports_tools` | `CHATBOT_PROVIDER_SUPPORTS_TOOLS` | `true` | Set `false` for providers that do not implement OpenAI's `tools` field (some self-hosted Ollama configs). When `false`, the tool registry is not consulted. |
 
+## Route middleware
+
+| Key | Env | Default | Description |
+| --- | --- | --- | --- |
+| `route_middleware` | `CHATBOT_ROUTE_MIDDLEWARE` | `['web']` | Middleware applied to the stateful routes (`POST /chatbot/messages`, `GET /chatbot/conversations/{id}/messages`) and the optional render routes (demo, test-fixture). `GET /chatbot/health` and `GET /chatbot/widget.js` are always outside this group. Set the env var to a comma-separated list to override (e.g. `web,throttle:api`); set it to an empty string to opt out entirely. Identity always rides the signed envelope, so both the write and history paths function correctly under any value, including `[]`. See [ADR-0009](/adr/0009-routes-under-configurable-web-middleware-with-envelope-identity). |
+
 ## Conversation lifecycle
 
 | Key | Env | Default | Description |
@@ -105,3 +111,4 @@ The following keys exist but are not part of the public contract — they may ch
 | Key | Notes |
 | --- | --- |
 | `envelope_ttl` | Envelope expiry in seconds (fixed at 900 in v1). Not declared in the published config; overriding requires editing the file directly. |
+| `playwright_fixture.enabled` | `CHATBOT_PLAYWRIGHT_FIXTURE`. When `true`, registers the `/chatbot/test-fixture` route and a deterministic `FakeClient` for the package's own Playwright e2e suite. **Never enable in production.** |

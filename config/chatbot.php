@@ -95,7 +95,7 @@ return [
     |--------------------------------------------------------------------------
     | Named channels
     |--------------------------------------------------------------------------
-    | Each channel can override model, system_prompt, conversation_ttl, and
+    | Each channel can override model, prompt, conversation_ttl, and
     | throttle settings. Keys absent from a channel fall back to top-level.
     |
     | Example:
@@ -103,9 +103,9 @@ return [
     | 'channels' => [
     |     'default' => [],
     |     'admin' => [
-    |         'model'         => 'gpt-4o',
-    |         'system_prompt' => 'You are an admin assistant with full access.',
-    |         'throttle'      => ['per_minute' => 5, 'per_day' => 50],
+    |         'model'    => 'gpt-4o',
+    |         'prompt'   => 'You are an admin assistant with full access.',
+    |         'throttle' => ['per_minute' => 5, 'per_day' => 50],
     |     ],
     | ],
     */
