@@ -3,8 +3,8 @@ var Hn = (a) => {
   throw TypeError(a);
 };
 var Ks = (a, t, e) => t in a ? Qs(a, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : a[t] = e;
-var A = (a, t, e) => Ks(a, typeof t != "symbol" ? t + "" : t, e), Wt = (a, t, e) => t.has(a) || Hn("Cannot " + e);
-var x = (a, t, e) => (Wt(a, t, "read from private field"), e ? e.call(a) : t.get(a)), C = (a, t, e) => t.has(a) ? Hn("Cannot add the same private member more than once") : t instanceof WeakSet ? t.add(a) : t.set(a, e), R = (a, t, e, n) => (Wt(a, t, "write to private field"), n ? n.call(a, e) : t.set(a, e), e), m = (a, t, e) => (Wt(a, t, "access private method"), e);
+var A = (a, t, e) => Ks(a, typeof t != "symbol" ? t + "" : t, e), qt = (a, t, e) => t.has(a) || Hn("Cannot " + e);
+var x = (a, t, e) => (qt(a, t, "read from private field"), e ? e.call(a) : t.get(a)), C = (a, t, e) => t.has(a) ? Hn("Cannot add the same private member more than once") : t instanceof WeakSet ? t.add(a) : t.set(a, e), R = (a, t, e, n) => (qt(a, t, "write to private field"), n ? n.call(a, e) : t.set(a, e), e), m = (a, t, e) => (qt(a, t, "access private method"), e);
 var Ke, me, Je, Ne, Rt, ls;
 class Js extends EventTarget {
   constructor(e = globalThis.fetch.bind(globalThis)) {
@@ -132,7 +132,7 @@ function jn(a) {
   return a;
 }
 const Ve = { exec: () => null };
-function Wn(a, t) {
+function qn(a, t) {
   const e = a.replace(/\|/g, (i, o, l) => {
     let c = !1, h = o;
     for (; --h >= 0 && l[h] === "\\"; )
@@ -172,7 +172,7 @@ function ii(a, t) {
       return n;
   return -1;
 }
-function qn(a, t, e, n) {
+function Wn(a, t, e, n) {
   const s = t.href, i = t.title ? Z(t.title) : null, o = a[1].replace(/\\([\[\]])/g, "$1");
   if (a[0].charAt(0) !== "!") {
     n.state.inLink = !0;
@@ -428,7 +428,7 @@ ${g}` : g;
     const e = this.rules.block.table.exec(t);
     if (!e || !/[:|]/.test(e[2]))
       return;
-    const n = Wn(e[1]), s = e[2].replace(/^\||\| *$/g, "").split("|"), i = e[3] && e[3].trim() ? e[3].replace(/\n[ \t]*$/, "").split(`
+    const n = qn(e[1]), s = e[2].replace(/^\||\| *$/g, "").split("|"), i = e[3] && e[3].trim() ? e[3].replace(/\n[ \t]*$/, "").split(`
 `) : [], o = {
       type: "table",
       raw: e[0],
@@ -447,7 +447,7 @@ ${g}` : g;
           align: o.align[l]
         });
       for (const l of i)
-        o.rows.push(Wn(l, o.header.length).map((c, h) => ({
+        o.rows.push(qn(l, o.header.length).map((c, h) => ({
           text: c,
           tokens: this.lexer.inline(c),
           header: !1,
@@ -534,7 +534,7 @@ ${g}` : g;
         o && (s = o[1], i = o[3]);
       } else
         i = e[3] ? e[3].slice(1, -1) : "";
-      return s = s.trim(), /^</.test(s) && (this.options.pedantic && !/>$/.test(n) ? s = s.slice(1) : s = s.slice(1, -1)), qn(e, {
+      return s = s.trim(), /^</.test(s) && (this.options.pedantic && !/>$/.test(n) ? s = s.slice(1) : s = s.slice(1, -1)), Wn(e, {
         href: s && s.replace(this.rules.inline.anyPunctuation, "$1"),
         title: i && i.replace(this.rules.inline.anyPunctuation, "$1")
       }, e[0], this.lexer);
@@ -552,7 +552,7 @@ ${g}` : g;
           text: o
         };
       }
-      return qn(n, i, n[0], this.lexer);
+      return Wn(n, i, n[0], this.lexer);
     }
   }
   emStrong(t, e, n = "") {
@@ -1614,7 +1614,7 @@ Jt || (Jt = function(t) {
     n[s - 1] = arguments[s];
   return new t(...n);
 });
-const Ae = N(Array.prototype.forEach), Bi = N(Array.prototype.lastIndexOf), Vn = N(Array.prototype.pop), Se = N(Array.prototype.push), Hi = N(Array.prototype.splice), H = Array.isArray, qe = N(String.prototype.toLowerCase), qt = N(String.prototype.toString), Qn = N(String.prototype.match), Re = N(String.prototype.replace), Kn = N(String.prototype.indexOf), Gi = N(String.prototype.trim), ji = N(Number.prototype.toString), Wi = N(Boolean.prototype.toString), Jn = typeof BigInt > "u" ? null : N(BigInt.prototype.toString), es = typeof Symbol > "u" ? null : N(Symbol.prototype.toString), v = N(Object.prototype.hasOwnProperty), je = N(Object.prototype.toString), U = N(RegExp.prototype.test), bt = qi(TypeError);
+const Ae = N(Array.prototype.forEach), Bi = N(Array.prototype.lastIndexOf), Vn = N(Array.prototype.pop), Se = N(Array.prototype.push), Hi = N(Array.prototype.splice), H = Array.isArray, We = N(String.prototype.toLowerCase), Wt = N(String.prototype.toString), Qn = N(String.prototype.match), Re = N(String.prototype.replace), Kn = N(String.prototype.indexOf), Gi = N(String.prototype.trim), ji = N(Number.prototype.toString), qi = N(Boolean.prototype.toString), Jn = typeof BigInt > "u" ? null : N(BigInt.prototype.toString), es = typeof Symbol > "u" ? null : N(Symbol.prototype.toString), v = N(Object.prototype.hasOwnProperty), je = N(Object.prototype.toString), U = N(RegExp.prototype.test), bt = Wi(TypeError);
 function N(a) {
   return function(t) {
     t instanceof RegExp && (t.lastIndex = 0);
@@ -1623,7 +1623,7 @@ function N(a) {
     return Kt(a, t, n);
   };
 }
-function qi(a) {
+function Wi(a) {
   return function() {
     for (var t = arguments.length, e = new Array(t), n = 0; n < t; n++)
       e[n] = arguments[n];
@@ -1631,7 +1631,7 @@ function qi(a) {
   };
 }
 function T(a, t) {
-  let e = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : qe;
+  let e = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : We;
   if (Xn && Xn(a, null), !H(t))
     return a;
   let n = t.length;
@@ -1650,12 +1650,12 @@ function Zi(a) {
     v(a, t) || (a[t] = null);
   return a;
 }
-function W(a) {
+function q(a) {
   const t = ve(null);
   for (const n of ks(a)) {
     var e = zi(n, 2);
     const s = e[0], i = e[1];
-    v(a, s) && (H(i) ? t[s] = Zi(i) : i && typeof i == "object" && i.constructor === Object ? t[s] = W(i) : t[s] = i);
+    v(a, s) && (H(i) ? t[s] = Zi(i) : i && typeof i == "object" && i.constructor === Object ? t[s] = q(i) : t[s] = i);
   }
   return t;
 }
@@ -1666,7 +1666,7 @@ function Yi(a) {
     case "number":
       return ji(a);
     case "boolean":
-      return Wi(a);
+      return qi(a);
     case "bigint":
       return Jn ? Jn(a) : "0";
     case "symbol":
@@ -1821,11 +1821,11 @@ function Ts() {
   let Mt = null;
   const Ln = T({}, ["alt", "class", "for", "id", "label", "name", "pattern", "placeholder", "role", "summary", "title", "value", "style", "xmlns"]), ft = "http://www.w3.org/1998/Math/MathML", dt = "http://www.w3.org/2000/svg", ie = "http://www.w3.org/1999/xhtml";
   let Ee = ie, zt = !1, $t = null;
-  const js = T({}, [ft, dt, ie], qt);
+  const js = T({}, [ft, dt, ie], Wt);
   let Pt = T({}, ["mi", "mo", "mn", "ms", "mtext"]), Ft = T({}, ["annotation-xml"]);
-  const Ws = T({}, ["title", "style", "font", "a", "script"]);
+  const qs = T({}, ["title", "style", "font", "a", "script"]);
   let Be = null;
-  const qs = ["application/xhtml+xml", "text/html"], Zs = "text/html";
+  const Ws = ["application/xhtml+xml", "text/html"], Zs = "text/html";
   let D = null, _e = null;
   const Ys = e.createElement("form"), Cn = function(r) {
     return r instanceof RegExp || r instanceof Function;
@@ -1833,10 +1833,10 @@ function Ts() {
     let r = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
     if (_e && _e === r)
       return;
-    (!r || typeof r != "object") && (r = {}), r = W(r), Be = // eslint-disable-next-line unicorn/prefer-includes
-    qs.indexOf(r.PARSER_MEDIA_TYPE) === -1 ? Zs : r.PARSER_MEDIA_TYPE, D = Be === "application/xhtml+xml" ? qt : qe, M = v(r, "ALLOWED_TAGS") && H(r.ALLOWED_TAGS) ? T({}, r.ALLOWED_TAGS, D) : wn, F = v(r, "ALLOWED_ATTR") && H(r.ALLOWED_ATTR) ? T({}, r.ALLOWED_ATTR, D) : Tn, $t = v(r, "ALLOWED_NAMESPACES") && H(r.ALLOWED_NAMESPACES) ? T({}, r.ALLOWED_NAMESPACES, qt) : js, Mt = v(r, "ADD_URI_SAFE_ATTR") && H(r.ADD_URI_SAFE_ATTR) ? T(W(Ln), r.ADD_URI_SAFE_ATTR, D) : Ln, In = v(r, "ADD_DATA_URI_TAGS") && H(r.ADD_DATA_URI_TAGS) ? T(W(vn), r.ADD_DATA_URI_TAGS, D) : vn, se = v(r, "FORBID_CONTENTS") && H(r.FORBID_CONTENTS) ? T({}, r.FORBID_CONTENTS, D) : Dt, Pe = v(r, "FORBID_TAGS") && H(r.FORBID_TAGS) ? T({}, r.FORBID_TAGS, D) : W({}), ut = v(r, "FORBID_ATTR") && H(r.FORBID_ATTR) ? T({}, r.FORBID_ATTR, D) : W({}), ye = v(r, "USE_PROFILES") ? r.USE_PROFILES && typeof r.USE_PROFILES == "object" ? W(r.USE_PROFILES) : r.USE_PROFILES : !1, yn = r.ALLOW_ARIA_ATTR !== !1, Lt = r.ALLOW_DATA_ATTR !== !1, En = r.ALLOW_UNKNOWN_PROTOCOLS || !1, _n = r.ALLOW_SELF_CLOSE_IN_ATTR !== !1, he = r.SAFE_FOR_TEMPLATES || !1, Fe = r.SAFE_FOR_XML !== !1, fe = r.WHOLE_DOCUMENT || !1, Te = r.RETURN_DOM || !1, pt = r.RETURN_DOM_FRAGMENT || !1, ht = r.RETURN_TRUSTED_TYPE || !1, Ot = r.FORCE_BODY || !1, An = r.SANITIZE_DOM !== !1, Sn = r.SANITIZE_NAMED_PROPS || !1, Nt = r.KEEP_CONTENT !== !1, Ue = r.IN_PLACE || !1, kn = Xi(r.ALLOWED_URI_REGEXP) ? r.ALLOWED_URI_REGEXP : rs, Ee = typeof r.NAMESPACE == "string" ? r.NAMESPACE : ie, Pt = v(r, "MATHML_TEXT_INTEGRATION_POINTS") && r.MATHML_TEXT_INTEGRATION_POINTS && typeof r.MATHML_TEXT_INTEGRATION_POINTS == "object" ? W(r.MATHML_TEXT_INTEGRATION_POINTS) : T({}, ["mi", "mo", "mn", "ms", "mtext"]), Ft = v(r, "HTML_INTEGRATION_POINTS") && r.HTML_INTEGRATION_POINTS && typeof r.HTML_INTEGRATION_POINTS == "object" ? W(r.HTML_INTEGRATION_POINTS) : T({}, ["annotation-xml"]);
-    const u = v(r, "CUSTOM_ELEMENT_HANDLING") && r.CUSTOM_ELEMENT_HANDLING && typeof r.CUSTOM_ELEMENT_HANDLING == "object" ? W(r.CUSTOM_ELEMENT_HANDLING) : ve(null);
-    if (L = ve(null), v(u, "tagNameCheck") && Cn(u.tagNameCheck) && (L.tagNameCheck = u.tagNameCheck), v(u, "attributeNameCheck") && Cn(u.attributeNameCheck) && (L.attributeNameCheck = u.attributeNameCheck), v(u, "allowCustomizedBuiltInElements") && typeof u.allowCustomizedBuiltInElements == "boolean" && (L.allowCustomizedBuiltInElements = u.allowCustomizedBuiltInElements), he && (Lt = !1), pt && (Te = !0), ye && (M = T({}, ns), F = ve(null), ye.html === !0 && (T(M, ts), T(F, ss)), ye.svg === !0 && (T(M, Zt), T(F, Vt), T(F, xt)), ye.svgFilters === !0 && (T(M, Yt), T(F, Vt), T(F, xt)), ye.mathMl === !0 && (T(M, Xt), T(F, is), T(F, xt))), le.tagCheck = null, le.attributeCheck = null, v(r, "ADD_TAGS") && (typeof r.ADD_TAGS == "function" ? le.tagCheck = r.ADD_TAGS : H(r.ADD_TAGS) && (M === wn && (M = W(M)), T(M, r.ADD_TAGS, D))), v(r, "ADD_ATTR") && (typeof r.ADD_ATTR == "function" ? le.attributeCheck = r.ADD_ATTR : H(r.ADD_ATTR) && (F === Tn && (F = W(F)), T(F, r.ADD_ATTR, D))), v(r, "ADD_URI_SAFE_ATTR") && H(r.ADD_URI_SAFE_ATTR) && T(Mt, r.ADD_URI_SAFE_ATTR, D), v(r, "FORBID_CONTENTS") && H(r.FORBID_CONTENTS) && (se === Dt && (se = W(se)), T(se, r.FORBID_CONTENTS, D)), v(r, "ADD_FORBID_CONTENTS") && H(r.ADD_FORBID_CONTENTS) && (se === Dt && (se = W(se)), T(se, r.ADD_FORBID_CONTENTS, D)), Nt && (M["#text"] = !0), fe && T(M, ["html", "head", "body"]), M.table && (T(M, ["tbody"]), delete Pe.tbody), r.TRUSTED_TYPES_POLICY) {
+    (!r || typeof r != "object") && (r = {}), r = q(r), Be = // eslint-disable-next-line unicorn/prefer-includes
+    Ws.indexOf(r.PARSER_MEDIA_TYPE) === -1 ? Zs : r.PARSER_MEDIA_TYPE, D = Be === "application/xhtml+xml" ? Wt : We, M = v(r, "ALLOWED_TAGS") && H(r.ALLOWED_TAGS) ? T({}, r.ALLOWED_TAGS, D) : wn, F = v(r, "ALLOWED_ATTR") && H(r.ALLOWED_ATTR) ? T({}, r.ALLOWED_ATTR, D) : Tn, $t = v(r, "ALLOWED_NAMESPACES") && H(r.ALLOWED_NAMESPACES) ? T({}, r.ALLOWED_NAMESPACES, Wt) : js, Mt = v(r, "ADD_URI_SAFE_ATTR") && H(r.ADD_URI_SAFE_ATTR) ? T(q(Ln), r.ADD_URI_SAFE_ATTR, D) : Ln, In = v(r, "ADD_DATA_URI_TAGS") && H(r.ADD_DATA_URI_TAGS) ? T(q(vn), r.ADD_DATA_URI_TAGS, D) : vn, se = v(r, "FORBID_CONTENTS") && H(r.FORBID_CONTENTS) ? T({}, r.FORBID_CONTENTS, D) : Dt, Pe = v(r, "FORBID_TAGS") && H(r.FORBID_TAGS) ? T({}, r.FORBID_TAGS, D) : q({}), ut = v(r, "FORBID_ATTR") && H(r.FORBID_ATTR) ? T({}, r.FORBID_ATTR, D) : q({}), ye = v(r, "USE_PROFILES") ? r.USE_PROFILES && typeof r.USE_PROFILES == "object" ? q(r.USE_PROFILES) : r.USE_PROFILES : !1, yn = r.ALLOW_ARIA_ATTR !== !1, Lt = r.ALLOW_DATA_ATTR !== !1, En = r.ALLOW_UNKNOWN_PROTOCOLS || !1, _n = r.ALLOW_SELF_CLOSE_IN_ATTR !== !1, he = r.SAFE_FOR_TEMPLATES || !1, Fe = r.SAFE_FOR_XML !== !1, fe = r.WHOLE_DOCUMENT || !1, Te = r.RETURN_DOM || !1, pt = r.RETURN_DOM_FRAGMENT || !1, ht = r.RETURN_TRUSTED_TYPE || !1, Ot = r.FORCE_BODY || !1, An = r.SANITIZE_DOM !== !1, Sn = r.SANITIZE_NAMED_PROPS || !1, Nt = r.KEEP_CONTENT !== !1, Ue = r.IN_PLACE || !1, kn = Xi(r.ALLOWED_URI_REGEXP) ? r.ALLOWED_URI_REGEXP : rs, Ee = typeof r.NAMESPACE == "string" ? r.NAMESPACE : ie, Pt = v(r, "MATHML_TEXT_INTEGRATION_POINTS") && r.MATHML_TEXT_INTEGRATION_POINTS && typeof r.MATHML_TEXT_INTEGRATION_POINTS == "object" ? q(r.MATHML_TEXT_INTEGRATION_POINTS) : T({}, ["mi", "mo", "mn", "ms", "mtext"]), Ft = v(r, "HTML_INTEGRATION_POINTS") && r.HTML_INTEGRATION_POINTS && typeof r.HTML_INTEGRATION_POINTS == "object" ? q(r.HTML_INTEGRATION_POINTS) : T({}, ["annotation-xml"]);
+    const u = v(r, "CUSTOM_ELEMENT_HANDLING") && r.CUSTOM_ELEMENT_HANDLING && typeof r.CUSTOM_ELEMENT_HANDLING == "object" ? q(r.CUSTOM_ELEMENT_HANDLING) : ve(null);
+    if (L = ve(null), v(u, "tagNameCheck") && Cn(u.tagNameCheck) && (L.tagNameCheck = u.tagNameCheck), v(u, "attributeNameCheck") && Cn(u.attributeNameCheck) && (L.attributeNameCheck = u.attributeNameCheck), v(u, "allowCustomizedBuiltInElements") && typeof u.allowCustomizedBuiltInElements == "boolean" && (L.allowCustomizedBuiltInElements = u.allowCustomizedBuiltInElements), he && (Lt = !1), pt && (Te = !0), ye && (M = T({}, ns), F = ve(null), ye.html === !0 && (T(M, ts), T(F, ss)), ye.svg === !0 && (T(M, Zt), T(F, Vt), T(F, xt)), ye.svgFilters === !0 && (T(M, Yt), T(F, Vt), T(F, xt)), ye.mathMl === !0 && (T(M, Xt), T(F, is), T(F, xt))), le.tagCheck = null, le.attributeCheck = null, v(r, "ADD_TAGS") && (typeof r.ADD_TAGS == "function" ? le.tagCheck = r.ADD_TAGS : H(r.ADD_TAGS) && (M === wn && (M = q(M)), T(M, r.ADD_TAGS, D))), v(r, "ADD_ATTR") && (typeof r.ADD_ATTR == "function" ? le.attributeCheck = r.ADD_ATTR : H(r.ADD_ATTR) && (F === Tn && (F = q(F)), T(F, r.ADD_ATTR, D))), v(r, "ADD_URI_SAFE_ATTR") && H(r.ADD_URI_SAFE_ATTR) && T(Mt, r.ADD_URI_SAFE_ATTR, D), v(r, "FORBID_CONTENTS") && H(r.FORBID_CONTENTS) && (se === Dt && (se = q(se)), T(se, r.FORBID_CONTENTS, D)), v(r, "ADD_FORBID_CONTENTS") && H(r.ADD_FORBID_CONTENTS) && (se === Dt && (se = q(se)), T(se, r.ADD_FORBID_CONTENTS, D)), Nt && (M["#text"] = !0), fe && T(M, ["html", "head", "body"]), M.table && (T(M, ["tbody"]), delete Pe.tbody), r.TRUSTED_TYPES_POLICY) {
       if (typeof r.TRUSTED_TYPES_POLICY.createHTML != "function")
         throw bt('TRUSTED_TYPES_POLICY configuration option must provide a "createHTML" hook.');
       if (typeof r.TRUSTED_TYPES_POLICY.createScriptURL != "function")
@@ -1851,8 +1851,8 @@ function Ts() {
       namespaceURI: Ee,
       tagName: "template"
     });
-    const d = qe(r.tagName), E = qe(u.tagName);
-    return $t[r.namespaceURI] ? r.namespaceURI === dt ? u.namespaceURI === ie ? d === "svg" : u.namespaceURI === ft ? d === "svg" && (E === "annotation-xml" || Pt[E]) : !!On[d] : r.namespaceURI === ft ? u.namespaceURI === ie ? d === "math" : u.namespaceURI === dt ? d === "math" && Ft[E] : !!Nn[d] : r.namespaceURI === ie ? u.namespaceURI === dt && !Ft[E] || u.namespaceURI === ft && !Pt[E] ? !1 : !Nn[d] && (Ws[d] || !On[d]) : !!(Be === "application/xhtml+xml" && $t[r.namespaceURI]) : !1;
+    const d = We(r.tagName), E = We(u.tagName);
+    return $t[r.namespaceURI] ? r.namespaceURI === dt ? u.namespaceURI === ie ? d === "svg" : u.namespaceURI === ft ? d === "svg" && (E === "annotation-xml" || Pt[E]) : !!On[d] : r.namespaceURI === ft ? u.namespaceURI === ie ? d === "math" : u.namespaceURI === dt ? d === "math" && Ft[E] : !!Nn[d] : r.namespaceURI === ie ? u.namespaceURI === dt && !Ft[E] || u.namespaceURI === ft && !Pt[E] ? !1 : !Nn[d] && (qs[d] || !On[d]) : !!(Be === "application/xhtml+xml" && $t[r.namespaceURI]) : !1;
   }, J = function(r) {
     Se(t.removed, {
       element: r
@@ -1986,7 +1986,7 @@ function Ts() {
     }
     return !0;
   }, Vs = T({}, ["annotation-xml", "color-profile", "font-face", "font-face-format", "font-face-name", "font-face-src", "font-face-uri", "missing-glyph"]), Pn = function(r) {
-    return !Vs[qe(r)] && U(Gs, r);
+    return !Vs[We(r)] && U(Gs, r);
   }, Fn = function(r) {
     ae(B.beforeSanitizeAttributes, r, null);
     const u = r.attributes;
@@ -2184,7 +2184,7 @@ class ur {
   }
 }
 De = new WeakMap();
-const as = (a) => `chatbot_open_${a}`, We = (a) => `chatbot_conversation_${a}`, pr = `
+const as = (a) => `chatbot_open_${a}`, qe = (a) => `chatbot_conversation_${a}`, pr = `
 :host {
   --chatbot-primary: #6366f1;
   --chatbot-on-primary: #ffffff;
@@ -2407,12 +2407,12 @@ const as = (a) => `chatbot_open_${a}`, We = (a) => `chatbot_conversation_${a}`, 
   .launcher { bottom: 16px; right: 16px; }
 }
 `;
-var q, et, re, Me, ge, tt, ce, te, be, xe, ze, ue, nt, p, tn, ys, Es, nn, sn, Ce, Ze, rn, _s, As, Ye, Ss, Rs, Xe, on, kt, Is, vs, an, Ls, ln, wt, cn, Cs, un, Os, Tt, yt, Ns, Ds, Ms, Et;
+var W, et, re, Me, ge, tt, ce, te, be, xe, ze, ue, nt, p, tn, ys, Es, nn, sn, Ce, Ze, rn, _s, As, Ye, Ss, Rs, Xe, on, kt, Is, vs, an, Ls, ln, wt, cn, Cs, un, Os, Tt, yt, Ns, Ds, Ms, Et;
 const Oe = class Oe extends HTMLElement {
   constructor() {
     super();
     C(this, p);
-    C(this, q);
+    C(this, W);
     C(this, et, new ur());
     C(this, re, !1);
     C(this, Me, !1);
@@ -2424,7 +2424,7 @@ const Oe = class Oe extends HTMLElement {
     C(this, xe, null);
     C(this, ze, null);
     C(this, ue, /* @__PURE__ */ new Map());
-    R(this, q, this.attachShadow({ mode: "open" }));
+    R(this, W, this.attachShadow({ mode: "open" }));
   }
   registerClientExtractor(e, n, s = {}) {
     if (x(Oe, nt).includes(e))
@@ -2451,10 +2451,10 @@ const Oe = class Oe extends HTMLElement {
     m(this, p, Tt).call(this, this.getAttribute("signed-context")).includes("blade-snapshot") && !x(this, ue).has("blade-snapshot") && m(this, p, tn).call(this, "blade-snapshot", () => m(this, p, ys).call(this), { description: "Page snapshot" });
   }
   attributeChangedCallback() {
-    x(this, q).innerHTML && m(this, p, nn).call(this);
+    x(this, W).innerHTML && m(this, p, nn).call(this);
   }
 };
-q = new WeakMap(), et = new WeakMap(), re = new WeakMap(), Me = new WeakMap(), ge = new WeakMap(), tt = new WeakMap(), ce = new WeakMap(), te = new WeakMap(), be = new WeakMap(), xe = new WeakMap(), ze = new WeakMap(), ue = new WeakMap(), nt = new WeakMap(), p = new WeakSet(), tn = function(e, n, s = {}) {
+W = new WeakMap(), et = new WeakMap(), re = new WeakMap(), Me = new WeakMap(), ge = new WeakMap(), tt = new WeakMap(), ce = new WeakMap(), te = new WeakMap(), be = new WeakMap(), xe = new WeakMap(), ze = new WeakMap(), ue = new WeakMap(), nt = new WeakMap(), p = new WeakSet(), tn = function(e, n, s = {}) {
   x(this, ue).set(e, { fn: n, description: s.description });
 }, ys = function() {
   const e = document.querySelectorAll("[data-chatbot-snapshot]");
@@ -2494,9 +2494,9 @@ ${n.get(l).join(`
   const e = document.createElement("style");
   e.textContent = pr;
   const n = this.position === "inline";
-  if (x(this, q).innerHTML = "", x(this, q).appendChild(e), !n) {
+  if (x(this, W).innerHTML = "", x(this, W).appendChild(e), !n) {
     const k = document.createElement("button");
-    k.className = `launcher ${this.position}`, k.part = "launcher", k.innerHTML = "💬", k.setAttribute("aria-label", "Open chat"), k.addEventListener("click", () => m(this, p, _s).call(this)), x(this, q).appendChild(k);
+    k.className = `launcher ${this.position}`, k.part = "launcher", k.innerHTML = "💬", k.setAttribute("aria-label", "Open chat"), k.addEventListener("click", () => m(this, p, _s).call(this)), x(this, W).appendChild(k);
   }
   const s = document.createElement("div");
   s.className = `panel ${n ? "inline" : this.position}`, s.part = "panel", !n && !x(this, re) && (s.hidden = !0);
@@ -2515,15 +2515,15 @@ ${n.get(l).join(`
     k.key === "Enter" && !k.shiftKey && (k.preventDefault(), m(this, p, Xe).call(this));
   }), h.appendChild(f);
   const g = document.createElement("button");
-  g.className = "send-button", g.part = "send-button", g.textContent = "Send", g.addEventListener("click", () => m(this, p, Xe).call(this)), h.appendChild(g), s.appendChild(h), x(this, q).appendChild(s);
+  g.className = "send-button", g.part = "send-button", g.textContent = "Send", g.addEventListener("click", () => m(this, p, Xe).call(this)), h.appendChild(g), s.appendChild(h), x(this, W).appendChild(s);
 }, sn = function() {
-  return x(this, q).querySelector(".panel");
+  return x(this, W).querySelector(".panel");
 }, Ce = function() {
-  return x(this, q).querySelector(".messages");
+  return x(this, W).querySelector(".messages");
 }, Ze = function() {
-  return x(this, q).querySelector(".input");
+  return x(this, W).querySelector(".input");
 }, rn = function() {
-  return x(this, q).querySelector(".send-button");
+  return x(this, W).querySelector(".send-button");
 }, _s = function() {
   var n;
   R(this, re, !x(this, re));
@@ -2539,25 +2539,25 @@ ${n.get(l).join(`
   const e = m(this, p, yt).call(this, this.getAttribute("signed-context")).g;
   typeof e == "string" && e && m(this, p, kt).call(this, e);
 }, Ss = async function() {
-  const e = localStorage.getItem(We(this.channel));
+  const e = localStorage.getItem(qe(this.channel));
   if (!e) {
     m(this, p, Ye).call(this);
     return;
   }
   try {
-    const n = await fetch(`/chatbot/conversations/${e}/messages`);
-    if (!n.ok) {
-      localStorage.removeItem(We(this.channel)), m(this, p, Ye).call(this);
+    const n = this.getAttribute("signed-context"), s = n ? `?signed_context=${encodeURIComponent(n)}` : "", i = await fetch(`/chatbot/conversations/${e}/messages${s}`);
+    if (!i.ok) {
+      localStorage.removeItem(qe(this.channel)), m(this, p, Ye).call(this);
       return;
     }
-    const { messages: s } = await n.json();
-    for (const i of s)
-      i.role === "user" ? m(this, p, on).call(this, i.content) : i.role === "assistant" && m(this, p, kt).call(this, i.content);
+    const { messages: o } = await i.json();
+    for (const l of o)
+      l.role === "user" ? m(this, p, on).call(this, l.content) : l.role === "assistant" && m(this, p, kt).call(this, l.content);
   } catch {
     m(this, p, Ye).call(this);
   }
 }, Rs = function() {
-  localStorage.removeItem(We(this.channel));
+  localStorage.removeItem(qe(this.channel));
   const e = m(this, p, Ce).call(this);
   e && (e.innerHTML = ""), R(this, ge, null), R(this, tt, null), R(this, ce, null), m(this, p, Ye).call(this);
 }, Xe = async function(e = null) {
@@ -2566,7 +2566,7 @@ ${n.get(l).join(`
   const n = m(this, p, Ze).call(this), s = e ?? (n == null ? void 0 : n.value.trim());
   if (!s) return;
   e === null && (n.value = ""), m(this, p, on).call(this, s);
-  const i = this.getAttribute("signed-context"), o = localStorage.getItem(We(this.channel)), l = await m(this, p, Ns).call(this, i);
+  const i = this.getAttribute("signed-context"), o = localStorage.getItem(qe(this.channel)), l = await m(this, p, Ns).call(this, i);
   m(this, p, Ds).call(this), m(this, p, Ms).call(this, l), R(this, Me, !0);
   const c = m(this, p, rn).call(this);
   c && (c.disabled = !0);
@@ -2580,7 +2580,7 @@ ${n.get(l).join(`
     y.textContent = w.detail.text;
   }), f.addEventListener("done", (w) => {
     var y;
-    m(this, p, un).call(this, h), (y = w.detail) != null && y.conversationId && localStorage.setItem(We(this.channel), w.detail.conversationId), m(this, p, vs).call(this, h), m(this, p, Et).call(this);
+    m(this, p, un).call(this, h), (y = w.detail) != null && y.conversationId && localStorage.setItem(qe(this.channel), w.detail.conversationId), m(this, p, vs).call(this, h), m(this, p, Et).call(this);
   }), f.addEventListener("tool_started", (w) => this.dispatchEvent(new CustomEvent("tool_started", { detail: w.detail }))), f.addEventListener("tool_finished", (w) => this.dispatchEvent(new CustomEvent("tool_finished", { detail: w.detail }))), f.addEventListener("tool_failed", (w) => this.dispatchEvent(new CustomEvent("tool_failed", { detail: w.detail }))), f.addEventListener("error", (w) => {
     m(this, p, an).call(this, w.detail, h, s, i, o), m(this, p, Et).call(this);
   });
@@ -2712,7 +2712,7 @@ yt = function(e) {
     }
   }))).filter((c) => c !== null);
 }, Ds = function() {
-  x(this, q).querySelectorAll('[part="extractor-chip"]').forEach((e) => e.remove());
+  x(this, W).querySelectorAll('[part="extractor-chip"]').forEach((e) => e.remove());
 }, Ms = function(e) {
   if (!e.length) return;
   const n = m(this, p, Ce).call(this);

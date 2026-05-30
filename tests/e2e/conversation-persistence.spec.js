@@ -35,11 +35,14 @@ test.describe('conversation persistence & greeting', () => {
 
     await page.reload()
 
-    // After reload the widget rehydrates from history (no greeting is shown
-    // when a stored conversation exists), so only the persisted turns appear.
+    // After reload the widget rehydrates from history, passing signed_context so
+    // the server scopes by the envelope. The response prepends the envelope
+    // greeting, so the restored thread is: greeting, the user turn, then the
+    // streamed answer.
     const restored = await openWidget(page)
     await expect(restored.locator('.message-user')).toContainText('Where is my order?')
-    await expect(restored.locator('.message-assistant')).toContainText('Order ORD-1042')
+    await expect(restored.locator('.message-assistant').first()).toContainText('Ask me about your order')
+    await expect(restored.locator('.message-assistant').last()).toContainText('Order ORD-1042')
   })
 
   test('cold start renders the signed-context greeting as an assistant bubble', async ({ page }) => {

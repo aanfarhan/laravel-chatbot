@@ -7,5 +7,8 @@ env:
   CHATBOT_DEMO: true
   CHATBOT_PLAYWRIGHT_FIXTURE: true
   CACHE_STORE: array
-  SESSION_DRIVER: array
+  # The widget-hosting routes now run under the `web` group (ADR-0009), so the
+  # serve target must persist sessions across requests for CSRF tokens to match.
+  # `array` regenerates the token every request and would 419 every POST.
+  SESSION_DRIVER: file
   DB_CONNECTION: sqlite

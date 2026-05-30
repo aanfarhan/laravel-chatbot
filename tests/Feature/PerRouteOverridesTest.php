@@ -107,7 +107,7 @@ it('rehydrate endpoint prepends greeting before persisted messages when signed_c
     $store->append($conv->id, 'user', 'What is my order?', 'orders.show', 'hash1');
 
     $response = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_guest_id', 'guest-abc')
+        ->withCookie('chatbot_guest_id', 'guest-abc')
         ->getJson("/chatbot/conversations/{$conv->uuid}/messages?signed_context={$signedContext}");
 
     $response->assertOk()

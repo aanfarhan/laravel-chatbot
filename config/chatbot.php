@@ -10,6 +10,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Route middleware group
+    |--------------------------------------------------------------------------
+    | Middleware wrapping the stateful package routes (POST /chatbot/messages,
+    | GET /chatbot/conversations/{id}/messages) and the widget-hosting render
+    | routes (demo, test-fixture). Defaults to ['web'], which brings session,
+    | cookie encryption, and CSRF protection as a second, independent barrier
+    | behind the signed context envelope. The stateless GET /chatbot/health and
+    | the cacheable GET /chatbot/widget.js stay outside the group regardless.
+    |
+    | Set CHATBOT_ROUTE_MIDDLEWARE to a comma-separated list to override (e.g.
+    | "web,throttle:api"); set it to an empty string to opt out entirely (no
+    | middleware). Identity always rides the signed envelope, so both the write
+    | and history paths function correctly under any value, including [].
+    */
+    'route_middleware' => env('CHATBOT_ROUTE_MIDDLEWARE') === null
+        ? ['web']
+        : array_values(array_filter(
+            array_map('trim', explode(',', (string) env('CHATBOT_ROUTE_MIDDLEWARE'))),
+            fn (string $middleware): bool => $middleware !== '',
+        )),
+
+    /*
+    |--------------------------------------------------------------------------
     | Stream duration
     |--------------------------------------------------------------------------
     | Wall-clock budget (seconds) for LLM token streaming within a single SSE

@@ -47,7 +47,7 @@ it('starts a new conversation after the idle window expires', function (): void 
     DB::table('chatbot_conversations')->update(['last_message_at' => now()->subSeconds(20)]);
 
     $r2 = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $convUuid)
+        ->withCookie('chatbot_conversation_default', (string) $convUuid)
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
             'message' => 'after idle',
@@ -68,11 +68,11 @@ it('reuses the same conversation on the second POST when cookie is carried', fun
     postAndStream($r1);
 
     $conversationUuid = DB::table('chatbot_conversations')->value('uuid');
-    $guestId = $r1->getCookie('chatbot_guest_id', decrypt: false)->getValue();
+    $guestId = $r1->getCookie('chatbot_guest_id')->getValue();
 
     $r2 = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $conversationUuid)
-        ->withUnencryptedCookie('chatbot_guest_id', $guestId)
+        ->withCookie('chatbot_conversation_default', (string) $conversationUuid)
+        ->withCookie('chatbot_guest_id', $guestId)
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
             'message' => 'second',
@@ -107,7 +107,7 @@ it('writes the conversation uuid, not the integer id, to the cookie', function (
     postAndStream($response);
 
     $uuid = DB::table('chatbot_conversations')->value('uuid');
-    $cookie = $response->getCookie('chatbot_conversation_default', decrypt: false)->getValue();
+    $cookie = $response->getCookie('chatbot_conversation_default')->getValue();
 
     expect($cookie)->toBe($uuid)
         ->and(Str::isUuid($cookie))->toBeTrue();

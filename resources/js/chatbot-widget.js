@@ -445,7 +445,12 @@ class ChatbotWidget extends HTMLElement {
       return
     }
     try {
-      const response = await fetch(`/chatbot/conversations/${conversationId}/messages`)
+      // History scopes by the verified envelope, so the rehydrate request must
+      // carry signed_context — the server takes ownership identity from it (a
+      // missing/invalid token is a 403), not from the session.
+      const envelope = this.getAttribute('signed-context')
+      const query = envelope ? `?signed_context=${encodeURIComponent(envelope)}` : ''
+      const response = await fetch(`/chatbot/conversations/${conversationId}/messages${query}`)
       if (!response.ok) {
         localStorage.removeItem(CONV_KEY(this.channel))
         this.#loadGreeting()
