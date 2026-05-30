@@ -8,6 +8,7 @@ final readonly class ConversationRecord
 {
     public function __construct(
         public int $id,
+        public string $uuid,
         public string $channel,
         public ?int $userId,
         public ?string $guestToken,

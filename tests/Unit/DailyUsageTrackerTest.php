@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Aanfarhan\Chatbot\DailyUsageTracker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -19,6 +20,7 @@ it('returns zeros when there are no messages today', function (): void {
 it('sums input and output tokens from today\'s messages for the matching user+channel', function (): void {
     $convId = DB::table('chatbot_conversations')->insertGetId([
         'channel' => 'default',
+        'uuid' => (string) Str::uuid(),
         'user_id' => 42,
         'guest_token' => null,
         'input_tokens' => 0,
@@ -43,6 +45,7 @@ it('sums input and output tokens from today\'s messages for the matching user+ch
 it('excludes messages from a different channel', function (): void {
     $convId = DB::table('chatbot_conversations')->insertGetId([
         'channel' => 'admin',
+        'uuid' => (string) Str::uuid(),
         'user_id' => 42,
         'guest_token' => null,
         'input_tokens' => 0,
@@ -65,6 +68,7 @@ it('excludes messages from a different channel', function (): void {
 it('excludes messages from yesterday (UTC midnight boundary)', function (): void {
     $convId = DB::table('chatbot_conversations')->insertGetId([
         'channel' => 'default',
+        'uuid' => (string) Str::uuid(),
         'user_id' => 7,
         'guest_token' => null,
         'input_tokens' => 0,

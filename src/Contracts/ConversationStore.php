@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot\Contracts;
 
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
+use Aanfarhan\Chatbot\Persistence\ConversationWithMessages;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 
 interface ConversationStore
 {
     public function start(string $channel, ?int $userId, ?string $guestToken): ConversationRecord;
 
-    public function find(int $id): ?ConversationRecord;
+    public function findByUuid(string $uuid): ?ConversationRecord;
+
+    public function findByUuidWithMessages(string $uuid): ?ConversationWithMessages;
 
     /**
      * @param  array<string, mixed>|null  $error

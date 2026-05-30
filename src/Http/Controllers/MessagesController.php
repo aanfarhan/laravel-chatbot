@@ -148,6 +148,7 @@ final class MessagesController
         $streamed = $coordinator->handle(
             messages: $messages,
             conversationId: $conversation->id,
+            conversationUuid: $conversation->uuid,
             routeName: $verified->route,
             contextHash: $contextHash,
             model: $model,
@@ -161,7 +162,7 @@ final class MessagesController
         $streamed->headers->set('Content-Type', 'text/event-stream; charset=UTF-8');
         $streamed->headers->set('Cache-Control', 'no-cache');
         $streamed->headers->set('X-Accel-Buffering', 'no');
-        $streamed->headers->setCookie(cookie($cookieName, (string) $conversation->id, $minuteTtl, '/chatbot'));
+        $streamed->headers->setCookie(cookie($cookieName, $conversation->uuid, $minuteTtl, '/chatbot'));
 
         if ($guestToken !== null) {
             $streamed->headers->setCookie(
@@ -215,10 +216,10 @@ final class MessagesController
     ): ConversationRecord {
         $cookieName = 'chatbot_conversation_'.$channel;
         $rawId = $request->cookie($cookieName);
-        $conversationId = is_string($rawId) && is_numeric($rawId) ? (int) $rawId : 0;
+        $uuid = is_string($rawId) && $rawId !== '' ? $rawId : null;
 
-        if ($conversationId > 0) {
-            $existing = $this->store->find($conversationId);
+        if ($uuid !== null) {
+            $existing = $this->store->findByUuid($uuid);
             if ($existing
                 && $this->withinIdleWindow($existing, $ttl)
                 && $this->ownsConversation($existing, $userId, $guestToken)) {

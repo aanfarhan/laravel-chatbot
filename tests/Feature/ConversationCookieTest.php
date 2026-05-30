@@ -7,6 +7,7 @@ use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
@@ -41,12 +42,12 @@ it('starts a new conversation after the idle window expires', function (): void 
     ])->assertOk();
     postAndStream($r1);
 
-    $convId = DB::table('chatbot_conversations')->value('id');
+    $convUuid = DB::table('chatbot_conversations')->value('uuid');
 
     DB::table('chatbot_conversations')->update(['last_message_at' => now()->subSeconds(20)]);
 
     $r2 = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $convId)
+        ->withUnencryptedCookie('chatbot_conversation_default', (string) $convUuid)
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
             'message' => 'after idle',
@@ -66,11 +67,11 @@ it('reuses the same conversation on the second POST when cookie is carried', fun
     ])->assertOk();
     postAndStream($r1);
 
-    $conversationId = DB::table('chatbot_conversations')->value('id');
+    $conversationUuid = DB::table('chatbot_conversations')->value('uuid');
     $guestId = $r1->getCookie('chatbot_guest_id', decrypt: false)->getValue();
 
     $r2 = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $conversationId)
+        ->withUnencryptedCookie('chatbot_conversation_default', (string) $conversationUuid)
         ->withUnencryptedCookie('chatbot_guest_id', $guestId)
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
@@ -93,4 +94,21 @@ it('sets the conversation cookie on the first POST', function (): void {
 
     $response->assertOk();
     $response->assertCookie('chatbot_conversation_default');
+});
+
+it('writes the conversation uuid, not the integer id, to the cookie', function (): void {
+    Chatbot::fake()->respondWithStream(['hello']);
+    $envelope = $this->extractSignedContext($this->get('/orders/1'));
+
+    $response = $this->postJson('/chatbot/messages', [
+        'signed_context' => $envelope,
+        'message' => 'hi',
+    ])->assertOk();
+    postAndStream($response);
+
+    $uuid = DB::table('chatbot_conversations')->value('uuid');
+    $cookie = $response->getCookie('chatbot_conversation_default', decrypt: false)->getValue();
+
+    expect($cookie)->toBe($uuid)
+        ->and(Str::isUuid($cookie))->toBeTrue();
 });

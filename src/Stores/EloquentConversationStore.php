@@ -8,6 +8,7 @@ use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Models\Conversation;
 use Aanfarhan\Chatbot\Models\Message;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
+use Aanfarhan\Chatbot\Persistence\ConversationWithMessages;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 
 final class EloquentConversationStore implements ConversationStore
@@ -23,11 +24,29 @@ final class EloquentConversationStore implements ConversationStore
         return $this->toRecord($conversation);
     }
 
-    public function find(int $id): ?ConversationRecord
+    public function findByUuid(string $uuid): ?ConversationRecord
     {
-        $conversation = Conversation::find($id);
+        $conversation = Conversation::where('uuid', $uuid)->first();
 
         return $conversation ? $this->toRecord($conversation) : null;
+    }
+
+    public function findByUuidWithMessages(string $uuid): ?ConversationWithMessages
+    {
+        $conversation = Conversation::with('messages')->where('uuid', $uuid)->first();
+
+        if ($conversation === null) {
+            return null;
+        }
+
+        return new ConversationWithMessages(
+            uuid: $conversation->uuid,
+            userId: $conversation->user_id,
+            guestToken: $conversation->guest_token,
+            messages: $conversation->messages
+                ->map(fn (Message $m): MessageRecord => $this->toMessageRecord($m))
+                ->all(),
+        );
     }
 
     /**
@@ -109,6 +128,7 @@ final class EloquentConversationStore implements ConversationStore
     {
         return new ConversationRecord(
             id: $conversation->id,
+            uuid: $conversation->uuid,
             channel: $conversation->channel,
             userId: $conversation->user_id,
             guestToken: $conversation->guest_token,

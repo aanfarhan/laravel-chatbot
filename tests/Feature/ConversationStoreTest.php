@@ -3,19 +3,57 @@
 declare(strict_types=1);
 
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
+use Aanfarhan\Chatbot\Models\Conversation;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
-it('find returns null for a soft-deleted conversation', function (): void {
+it('mints a UUIDv4 handle on start', function (): void {
     $store = app(ConversationStore::class);
+
     $conv = $store->start(channel: 'default', userId: 5, guestToken: null);
 
-    $store->delete($conv->id);
+    expect($conv->uuid)->toBeString()
+        ->and(Str::isUuid($conv->uuid))->toBeTrue();
+});
 
-    expect($store->find($conv->id))->toBeNull();
+it('does not let the uuid be mass-assigned', function (): void {
+    $injected = (string) Str::uuid();
+
+    $conversation = Conversation::create([
+        'channel' => 'default',
+        'uuid' => $injected,
+    ]);
+
+    expect($conversation->uuid)->not->toBe($injected)
+        ->and(Str::isUuid($conversation->uuid))->toBeTrue();
+});
+
+it('findByUuidWithMessages returns the conversation, owner and messages in order', function (): void {
+    $store = app(ConversationStore::class);
+    $conv = $store->start(channel: 'default', userId: null, guestToken: 'guest-abc');
+    $store->append($conv->id, 'user', 'Hello', 'orders.show', 'h1');
+    $store->append($conv->id, 'assistant', 'Hi there', 'orders.show', 'h1');
+
+    $found = $store->findByUuidWithMessages($conv->uuid);
+
+    expect($found)->not->toBeNull()
+        ->and($found->uuid)->toBe($conv->uuid)
+        ->and($found->guestToken)->toBe('guest-abc')
+        ->and($found->userId)->toBeNull()
+        ->and($found->messages)->toHaveCount(2)
+        ->and($found->messages[0]->role)->toBe('user')
+        ->and($found->messages[0]->content)->toBe('Hello')
+        ->and($found->messages[1]->role)->toBe('assistant');
+});
+
+it('findByUuidWithMessages returns null for an unknown handle', function (): void {
+    $store = app(ConversationStore::class);
+
+    expect($store->findByUuidWithMessages((string) Str::uuid()))->toBeNull();
 });
 
 it('append stores a message with route_name and context_hash', function (): void {
@@ -42,7 +80,22 @@ it('append stores a message with route_name and context_hash', function (): void
         ->and($msg->conversationId)->toBe($conv->id);
 });
 
-it('starts and finds a conversation for a guest', function (): void {
+it('findByUuid returns null for a soft-deleted conversation', function (): void {
+    $store = app(ConversationStore::class);
+    $conv = $store->start(channel: 'default', userId: 5, guestToken: null);
+
+    $store->delete($conv->id);
+
+    expect($store->findByUuid($conv->uuid))->toBeNull();
+});
+
+it('findByUuid returns null for an unknown handle', function (): void {
+    $store = app(ConversationStore::class);
+
+    expect($store->findByUuid((string) Str::uuid()))->toBeNull();
+});
+
+it('starts and finds a conversation by uuid for a guest', function (): void {
     $store = app(ConversationStore::class);
 
     $conv = $store->start(channel: 'support', userId: null, guestToken: 'guest-abc');
@@ -51,14 +104,14 @@ it('starts and finds a conversation for a guest', function (): void {
         ->and($conv->guestToken)->toBe('guest-abc')
         ->and($conv->channel)->toBe('support');
 
-    $found = $store->find($conv->id);
+    $found = $store->findByUuid($conv->uuid);
 
     expect($found)->not->toBeNull()
         ->and($found->guestToken)->toBe('guest-abc')
         ->and($found->userId)->toBeNull();
 });
 
-it('starts and finds a conversation for an authenticated user', function (): void {
+it('starts and finds a conversation by uuid for an authenticated user', function (): void {
     $store = app(ConversationStore::class);
 
     $conv = $store->start(channel: 'default', userId: 42, guestToken: null);
@@ -68,7 +121,7 @@ it('starts and finds a conversation for an authenticated user', function (): voi
         ->and($conv->userId)->toBe(42)
         ->and($conv->guestToken)->toBeNull();
 
-    $found = $store->find($conv->id);
+    $found = $store->findByUuid($conv->uuid);
 
     expect($found)->not->toBeNull()
         ->and($found->id)->toBe($conv->id)

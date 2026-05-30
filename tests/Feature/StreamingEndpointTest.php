@@ -7,6 +7,7 @@ use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 uses(InteractsWithChatbot::class);
@@ -89,4 +90,26 @@ it('returns text/event-stream with token events then done', function (): void {
     expect($events[1])->toBe(['event' => 'token', 'data' => ['content' => ' world']]);
     expect($events[2]['event'])->toBe('done');
     expect($events[2]['data'])->toHaveKey('usage');
+});
+
+it('emits the conversation uuid as conversation_id in the done event', function (): void {
+    Chatbot::fake()->respondWithStream(['Hello']);
+    $envelope = $this->extractSignedContext($this->get('/orders/7'));
+
+    $response = $this->post('/chatbot/messages', [
+        'signed_context' => $envelope,
+        'message' => 'hi',
+    ]);
+
+    ob_start();
+    $response->baseResponse->sendContent();
+    $output = (string) ob_get_clean();
+
+    $events = parseSseResponse($output);
+    $done = end($events);
+    $uuid = DB::table('chatbot_conversations')->value('uuid');
+
+    expect($done['event'])->toBe('done')
+        ->and($done['data']['conversation_id'])->toBe($uuid)
+        ->and(Str::isUuid($done['data']['conversation_id']))->toBeTrue();
 });

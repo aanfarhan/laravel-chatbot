@@ -8,9 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
+ * @property string $uuid
  * @property string $channel
  * @property int|null $user_id
  * @property string|null $guest_token
@@ -29,6 +31,16 @@ final class Conversation extends Model
     protected $table = 'chatbot_conversations';
 
     protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        // The uuid is the only conversation identifier exposed to the client.
+        // Mint it authoritatively on create so it is never settable from a
+        // request or from start() arguments. See ADR-0008.
+        self::creating(function (self $conversation): void {
+            $conversation->uuid = (string) Str::uuid();
+        });
+    }
 
     protected function casts(): array
     {

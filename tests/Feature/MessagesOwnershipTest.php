@@ -51,7 +51,7 @@ it('starts a fresh conversation when the cookie names a conversation owned by a 
     $envelope = $this->extractSignedContext($this->get('/orders/1'));
 
     $response = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $victim->id)
+        ->withUnencryptedCookie('chatbot_conversation_default', $victim->uuid)
         ->withUnencryptedCookie('chatbot_guest_id', 'guest-B')
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
@@ -77,7 +77,7 @@ it('does not let an authenticated requester resume a guest-owned conversation vi
     $envelope = $this->extractSignedContext($this->get('/orders/1'));
 
     $response = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $victim->id)
+        ->withUnencryptedCookie('chatbot_conversation_default', $victim->uuid)
         ->withUnencryptedCookie('chatbot_guest_id', 'guest-A')
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
@@ -102,7 +102,7 @@ it('starts a fresh conversation when the cookie names a conversation owned by a 
     $envelope = $this->extractSignedContext($this->get('/orders/1'));
 
     $response = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $victim->id)
+        ->withUnencryptedCookie('chatbot_conversation_default', $victim->uuid)
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
             'message' => 'attacker turn',
@@ -122,7 +122,7 @@ it('never reuses an anonymized conversation owned by neither party', function ()
     $envelope = $this->extractSignedContext($this->get('/orders/1'));
 
     $response = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $orphan->id)
+        ->withUnencryptedCookie('chatbot_conversation_default', $orphan->uuid)
         ->withUnencryptedCookie('chatbot_guest_id', 'guest-Z')
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,
@@ -143,7 +143,7 @@ it('resumes the same conversation for the legitimate guest owner', function (): 
     $envelope = $this->extractSignedContext($this->get('/orders/1'));
 
     $response = $this->withCredentials()
-        ->withUnencryptedCookie('chatbot_conversation_default', (string) $owned->id)
+        ->withUnencryptedCookie('chatbot_conversation_default', $owned->uuid)
         ->withUnencryptedCookie('chatbot_guest_id', 'guest-X')
         ->postJson('/chatbot/messages', [
             'signed_context' => $envelope,

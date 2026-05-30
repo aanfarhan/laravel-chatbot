@@ -21,6 +21,12 @@ The subset of tool names a given **Channel** is permitted to call. Declared per-
 ### Context
 The static, host-supplied data block injected into the system prompt at conversation start. Contrast with **Tool**, which fetches data dynamically during a turn.
 
+### Conversation
+A single ongoing thread of user/assistant turns on one [[channel]]. Owned by exactly one party — an authenticated host user **or** a guest — never both, and possibly neither once anonymized (see [[conversation-ownership]]). The widget resumes a conversation across page loads by presenting its identifier; the server only honours that identifier for the party that owns the conversation.
+
+### Conversation ownership
+The rule that binds a [[conversation]] to the party allowed to read or append to it. An authenticated requester is matched on host user identity only; a guest is matched on their guest token only — the two are never cross-honoured, so a logged-in user cannot resume a guest thread (or vice versa) by carrying a stale token. A conversation owned by neither party (e.g. after GDPR anonymization) is reusable by no one. Enforced server-side on both the read path (history) and the append path (messages); a presented identifier that fails the ownership check is treated as absent — the server silently starts a fresh conversation rather than revealing that the identifier exists. The identifier presented by the client is the conversation's exposed UUID handle, never its internal primary key. See ADR-0008.
+
 ### Channel
 A named widget mount point (e.g. `default`, `admin`). Carries its own prompt, context, and — under this feature — tool allowlist.
 

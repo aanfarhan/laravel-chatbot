@@ -82,6 +82,7 @@ final class StreamCoordinator
         string $channel = 'default',
         ?array $allowedTools = null,
         ?Authenticatable $actor = null,
+        string $conversationUuid = '',
     ): StreamedResponse {
         $isAborted ??= static fn (): bool => (bool) connection_aborted();
         $rawDuration = $this->config->get('chatbot.stream_duration', 60);
@@ -90,6 +91,7 @@ final class StreamCoordinator
         return new StreamedResponse(function () use (
             $messages,
             $conversationId,
+            $conversationUuid,
             $routeName,
             $contextHash,
             $isAborted,
@@ -271,7 +273,7 @@ final class StreamCoordinator
                     $this->logger?->info('[chatbot] turn failed', $logContext);
                 } else {
                     $this->emit('done', [
-                        'conversation_id' => $conversationId,
+                        'conversation_id' => $conversationUuid,
                         'usage' => [
                             'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
                             'output_tokens' => $usage !== null ? $usage->outputTokens : 0,

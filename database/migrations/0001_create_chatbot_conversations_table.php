@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('chatbot_conversations', function (Blueprint $table): void {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->string('guest_token')->nullable()->index();
             $table->string('channel');

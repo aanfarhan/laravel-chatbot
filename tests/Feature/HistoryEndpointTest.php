@@ -47,7 +47,7 @@ it('rehydrate returns messages for valid guest owner', function (): void {
 
     $response = $this->withCredentials()
         ->withUnencryptedCookie('chatbot_guest_id', 'guest-abc')
-        ->getJson("/chatbot/conversations/{$conv->id}/messages");
+        ->getJson("/chatbot/conversations/{$conv->uuid}/messages");
 
     $response->assertOk()
         ->assertJsonCount(2, 'messages')
@@ -61,7 +61,7 @@ it('rehydrate denies access with a different guest token', function (): void {
 
     $response = $this->withCredentials()
         ->withUnencryptedCookie('chatbot_guest_id', 'guest-DIFFERENT')
-        ->getJson("/chatbot/conversations/{$conv->id}/messages");
+        ->getJson("/chatbot/conversations/{$conv->uuid}/messages");
 
     $response->assertStatus(403);
 });
@@ -73,7 +73,7 @@ it('rehydrate denies cross-user access', function (): void {
 
     $response = $this->withCredentials()
         ->withUnencryptedCookie('chatbot_guest_id', 'some-guest')
-        ->getJson("/chatbot/conversations/{$conv->id}/messages");
+        ->getJson("/chatbot/conversations/{$conv->uuid}/messages");
 
     $response->assertStatus(403);
 });
