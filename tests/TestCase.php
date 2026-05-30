@@ -30,4 +30,17 @@ abstract class TestCase extends BaseTestCase
     {
         return [ChatbotServiceProvider::class];
     }
+
+    /**
+     * Pin the cache store to the in-memory array driver so the suite stays
+     * hermetic. A concurrently-running `testbench serve` (Playwright webServer)
+     * can leak a database cache-store config into the shared skeleton; the
+     * throttle path would then query a non-existent `cache` table and 500.
+     *
+     * @param  Application  $app
+     */
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('cache.default', 'array');
+    }
 }
