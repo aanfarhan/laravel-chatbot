@@ -7,7 +7,6 @@ namespace Aanfarhan\Chatbot\Http\Controllers;
 use Aanfarhan\Chatbot\Chatbot;
 use Aanfarhan\Chatbot\ContextSanitizer;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
-use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\ConversationReplay;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
@@ -17,36 +16,30 @@ use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
 use Aanfarhan\Chatbot\PromptAssembler;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
+use Aanfarhan\Chatbot\ThreadedActorResolver;
 use Aanfarhan\Chatbot\TokenCounter;
-use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Cache\RateLimiter;
-use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Contracts\Config\Repository;
-use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class MessagesController
 {
     public function __construct(
-        private readonly LLMClient $llm,
         private readonly ContextEnvelope $envelope,
         private readonly PromptAssembler $assembler,
         private readonly ContextSanitizer $sanitizer,
         private readonly Repository $config,
         private readonly ConversationStore $store,
-        private readonly Dispatcher $events,
         private readonly Chatbot $chatbot,
         private readonly RateLimiter $rateLimiter,
-        private readonly ToolInvoker $toolInvoker,
         private readonly ConversationReplay $replay,
         private readonly TokenCounter $tokenCounter,
-        private readonly AuthFactory $auth,
-        private readonly ?LoggerInterface $logger = null,
+        private readonly ThreadedActorResolver $actorResolver,
+        private readonly StreamCoordinator $coordinator,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -140,12 +133,7 @@ final class MessagesController
             contextHash: $contextHash,
         );
 
-        $coordinator = new StreamCoordinator($this->llm, $this->store, $this->config, events: $this->events, logger: $this->logger, toolInvoker: $this->toolInvoker);
-
-        $actor = null;
-        if ($verified->userId !== null) {
-            $actor = $this->auth->guard()->getProvider()->retrieveById($verified->userId);
-        }
+        $actor = $this->actorResolver->reconstitute($verified->userId);
 
         $quotaPreflight = function () use ($request): void {
             $quota = $this->chatbot->resolveQuota($request);
@@ -157,7 +145,7 @@ final class MessagesController
         $cookieName = 'chatbot_conversation_'.$verified->channel;
         $minuteTtl = (int) ceil($ttl / 60);
 
-        $streamed = $coordinator->handle(
+        $streamed = $this->coordinator->handle(
             messages: $messages,
             conversationId: $conversation->id,
             conversationUuid: $conversation->uuid,

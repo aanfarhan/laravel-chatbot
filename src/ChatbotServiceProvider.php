@@ -92,6 +92,8 @@ final class ChatbotServiceProvider extends ServiceProvider
             },
         );
 
+        $this->app->singleton(ThreadedActorResolver::class, fn (Application $app): ThreadedActorResolver => new ThreadedActorResolver($app->make('auth')));
+
         $this->app->singleton(StreamEmitter::class, fn (): StreamEmitter => new SseStreamEmitter);
 
         $this->app->singleton(ToolInvoker::class, function (Application $app): ToolInvoker {
