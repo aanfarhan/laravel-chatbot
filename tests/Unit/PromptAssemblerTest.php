@@ -159,6 +159,41 @@ it('truncates a context section exceeding the per-section size cap and appends a
         ->and(strlen($system))->toBeLessThan(500);
 });
 
+it('keeps a truncated context section within the configured byte cap', function (): void {
+    $cap = 100;
+    $assembler = new PromptAssembler(sectionSizeCap: $cap);
+
+    $messages = $assembler->assemble(
+        channelConfig: [],
+        routeOverrides: [],
+        contextPayload: ['big' => str_repeat('x', 500)],
+        history: [],
+        userMessage: 'Hi',
+    );
+
+    preg_match('|<big>(.*)</big>|s', $messages[0]['content'], $m);
+
+    expect(strlen($m[1]))->toBeLessThanOrEqual($cap);
+});
+
+it('never splits a multi-byte character when truncating a context section', function (): void {
+    $assembler = new PromptAssembler(sectionSizeCap: 100);
+
+    // Leading 'a' shifts the cap boundary to land mid-way through a 2-byte é.
+    $messages = $assembler->assemble(
+        channelConfig: [],
+        routeOverrides: [],
+        contextPayload: ['big' => 'a'.str_repeat('é', 200)],
+        history: [],
+        userMessage: 'Hi',
+    );
+
+    preg_match('|<big>(.*)\[truncated\]</big>|s', $messages[0]['content'], $m);
+
+    expect(mb_check_encoding($m[1], 'UTF-8'))->toBeTrue()
+        ->and($m[1])->not->toContain("\u{FFFD}");
+});
+
 it('resolves closures in context payload at assembly time', function (): void {
     $assembler = new PromptAssembler;
     $resolved = false;

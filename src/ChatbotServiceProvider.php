@@ -47,7 +47,13 @@ final class ChatbotServiceProvider extends ServiceProvider
 
         $this->app->singleton(
             PromptAssembler::class,
-            fn (): PromptAssembler => new PromptAssembler,
+            function (Application $app): PromptAssembler {
+                /** @var Repository $config */
+                $config = $app->make('config');
+                $cap = $config->get('chatbot.context.section_size_cap', 4096);
+
+                return new PromptAssembler(sectionSizeCap: is_int($cap) ? $cap : 4096);
+            },
         );
 
         $this->app->singleton(

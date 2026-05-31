@@ -9,6 +9,7 @@ use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\BigResultTool;
 use Aanfarhan\Chatbot\Tests\Stubs\FailingTool;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
+use Aanfarhan\Chatbot\Tests\Stubs\MultibyteResultTool;
 use Aanfarhan\Chatbot\Tests\Stubs\UnauthorizedTool;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -263,6 +264,88 @@ it('truncates tool results over 4096 bytes with [truncated] suffix', function ()
     }
 
     expect($matched)->toBeTrue('expected a truncated tool result in recorded prompts');
+});
+
+function recordedToolContent(string $name, object $fake): ?string
+{
+    foreach ($fake->recordedPrompts() as $messages) {
+        foreach ($messages as $msg) {
+            if (($msg['role'] ?? '') === 'tool' && ($msg['name'] ?? '') === $name) {
+                return (string) ($msg['content'] ?? '');
+            }
+        }
+    }
+
+    return null;
+}
+
+it('keeps a truncated tool result within the configured result_size_cap', function (): void {
+    config()->set('chatbot.tools.result_size_cap', 100);
+    Chatbot::registerTool(BigResultTool::class);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('big_result', [], 'call_big');
+    $fake->respondWithStream(['Got it.']);
+
+    $store = Mockery::mock(ConversationStore::class);
+    $store->shouldReceive('append')->andReturn(makeToolMessageRecord());
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'get big data']],
+        conversationId: 1,
+        routeName: 'test',
+        contextHash: 'abc',
+    )->sendContent();
+    ob_end_clean();
+
+    $content = recordedToolContent('big_result', $fake);
+
+    expect($content)->not->toBeNull()
+        ->and(strlen((string) $content))->toBeLessThanOrEqual(100);
+});
+
+it('never splits a multi-byte character when truncating a tool result', function (): void {
+    config()->set('chatbot.tools.result_size_cap', 100);
+    Chatbot::registerTool(MultibyteResultTool::class);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('multibyte_result', [], 'call_mb');
+    $fake->respondWithStream(['Got it.']);
+
+    $store = Mockery::mock(ConversationStore::class);
+    $store->shouldReceive('append')->andReturn(makeToolMessageRecord());
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'get big data']],
+        conversationId: 1,
+        routeName: 'test',
+        contextHash: 'abc',
+    )->sendContent();
+    ob_end_clean();
+
+    $content = (string) recordedToolContent('multibyte_result', $fake);
+    $body = substr($content, 0, -strlen('[truncated]'));
+
+    expect(str_ends_with($content, '[truncated]'))->toBeTrue()
+        ->and(strlen($content))->toBeLessThanOrEqual(100)
+        ->and(mb_check_encoding($body, 'UTF-8'))->toBeTrue()
+        ->and($body)->not->toContain("\u{FFFD}");
 });
 
 // --- Max calls cap: budget exhausted ---

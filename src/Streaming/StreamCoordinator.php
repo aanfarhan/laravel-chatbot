@@ -15,6 +15,7 @@ use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
+use Aanfarhan\Chatbot\Support\Truncator;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
@@ -30,8 +31,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 final class StreamCoordinator
 {
     private const CACHE_COUNTER_KEY = 'chatbot.active_streams';
-
-    private const RESULT_SIZE_CAP = 4096;
 
     private ?ToolArgumentValidator $argumentValidator = null;
 
@@ -330,6 +329,13 @@ final class StreamCoordinator
         return is_int($raw) ? $raw : 10;
     }
 
+    private function resultSizeCap(): int
+    {
+        $raw = $this->config->get('chatbot.tools.result_size_cap', 4096);
+
+        return is_int($raw) ? $raw : 4096;
+    }
+
     /**
      * @param  list<string>|null  $allowedTools
      * @return array{role: string, tool_call_id: string, name: string, content: string}
@@ -408,9 +414,7 @@ final class StreamCoordinator
 
             $encoded = is_array($result) ? json_encode($result, JSON_THROW_ON_ERROR) : (string) $result;
 
-            if (strlen($encoded) > self::RESULT_SIZE_CAP) {
-                $encoded = substr($encoded, 0, self::RESULT_SIZE_CAP).'[truncated]';
-            }
+            $encoded = Truncator::toByteCap($encoded, $this->resultSizeCap());
 
             $this->emit('tool_finished', ['name' => $name, 'phase' => 'finished']);
 

@@ -80,6 +80,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Context section size cap
+    |--------------------------------------------------------------------------
+    | Maximum byte length of each individual [[context]] section embedded in the
+    | system prompt. A section over the cap is truncated on a UTF-8-safe boundary
+    | and marked '[truncated]'; the marker counts toward the cap, so the emitted
+    | section never exceeds it. ~4096 bytes is roughly 1k tokens — raise it for
+    | hosts that feed large context blocks, bounded by the whole-prompt token_cap.
+    */
+    'context' => [
+        'section_size_cap' => (int) env('CHATBOT_CONTEXT_SECTION_SIZE_CAP', 4096),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Daily token quota
     |--------------------------------------------------------------------------
     | Per-user daily budget tracked by DailyUsageTracker reading from
@@ -139,12 +153,18 @@ return [
     |   call, so it always uses a completed result even if it overran. Bounding
     |   actual tool runtime is the host's job: set HTTP-client timeouts and query
     |   limits, and offload long work to a queue rather than a tool. See ADR-0006.
+    | result_size_cap: maximum byte length of a single tool result fed back to
+    |   the model. An oversized result is truncated on a UTF-8-safe boundary and
+    |   marked '[truncated]'; the marker counts toward the cap. ~4096 bytes is
+    |   roughly 1k tokens — raise it for search/list/retrieval tools whose
+    |   results routinely exceed 4KB, bounded by the whole-prompt token_cap.
     */
     'tools' => [
         'max_calls_per_turn' => (int) env('CHATBOT_TOOLS_MAX_CALLS_PER_TURN', 5),
         'default_timeout' => (int) env('CHATBOT_TOOLS_DEFAULT_TIMEOUT', 10),
         'replay_freshness' => (int) env('CHATBOT_TOOLS_REPLAY_FRESHNESS', 300),
         'default_max_arg_length' => (int) env('CHATBOT_TOOLS_DEFAULT_MAX_ARG_LENGTH', 10240),
+        'result_size_cap' => (int) env('CHATBOT_TOOLS_RESULT_SIZE_CAP', 4096),
     ],
 
     /*

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Aanfarhan\Chatbot;
 
+use Aanfarhan\Chatbot\Support\Truncator;
+
 final class PromptAssembler
 {
     private const BASE_PROMPT = <<<'PROMPT'
@@ -95,9 +97,7 @@ final class PromptAssembler
 
             $encoded = (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-            if (strlen($encoded) > $this->sectionSizeCap) {
-                $encoded = substr($encoded, 0, $this->sectionSizeCap).'[truncated]';
-            }
+            $encoded = Truncator::toByteCap($encoded, $this->sectionSizeCap);
 
             $sections .= sprintf("<%s>%s</%s>\n", $key, $encoded, $key);
         }

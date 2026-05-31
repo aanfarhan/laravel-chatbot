@@ -41,6 +41,7 @@ Per-IP+channel throttle applied to all chatbot endpoints. Per-channel override s
 | `token_cap` | `CHATBOT_TOKEN_CAP` | `32768` | Max input tokens per assembled prompt. Oldest history is pruned to fit. A single user message exceeding the cap raises `ChatbotTokenCapExceededException`. |
 | `daily_quota.input` | `CHATBOT_DAILY_QUOTA_INPUT` | `200000` | Per-user input-token budget; resets at UTC midnight. Exhaustion raises `ChatbotQuotaExceededException`. |
 | `daily_quota.output` | `CHATBOT_DAILY_QUOTA_OUTPUT` | `50000` | Per-user output-token budget; resets at UTC midnight. |
+| `context.section_size_cap` | `CHATBOT_CONTEXT_SECTION_SIZE_CAP` | `4096` | Max byte length of each individual context section in the system prompt. Oversized sections are truncated on a UTF-8-safe boundary and marked `[truncated]` (the marker counts toward the cap). |
 
 ## Tool-calling
 
@@ -50,6 +51,7 @@ Per-IP+channel throttle applied to all chatbot endpoints. Per-channel override s
 | `tools.default_timeout` | `CHATBOT_TOOLS_DEFAULT_TIMEOUT` | `10` | **Advisory** per-tool budget in seconds — measured and recorded (the invocation is flagged `overran`), _not_ enforced. The package runs `handle()` synchronously and cannot interrupt a blocking call; a completed result is always used even if it overran. Bound real tool runtime yourself (HTTP-client timeouts, query limits, queue offload). See [ADR-0006](/adr/0006-advisory-tool-timeouts-not-hard-interruption). |
 | `tools.replay_freshness` | `CHATBOT_TOOLS_REPLAY_FRESHNESS` | `300` | Seconds an invocation remains valid for history replay. (Implemented; not yet wired into the request cycle.) |
 | `tools.default_max_arg_length` | `CHATBOT_TOOLS_DEFAULT_MAX_ARG_LENGTH` | `10240` | Max byte length for any single tool string argument. |
+| `tools.result_size_cap` | `CHATBOT_TOOLS_RESULT_SIZE_CAP` | `4096` | Max byte length of a single tool result fed back to the model. Oversized results are truncated on a UTF-8-safe boundary and marked `[truncated]` (the marker counts toward the cap). |
 
 ## Context sanitizer
 
