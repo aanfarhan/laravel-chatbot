@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot\Tools;
 
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
+use Aanfarhan\Chatbot\Contracts\ToolResolver;
 use Aanfarhan\Chatbot\Exceptions\ForbiddenToolArgumentException;
 use Illuminate\Contracts\Foundation\Application;
 
-final class ToolRegistry
+final class ToolRegistry implements ToolResolver
 {
     private const FORBIDDEN_ARG_NAMES = [
         'user_id', 'userid', 'user',

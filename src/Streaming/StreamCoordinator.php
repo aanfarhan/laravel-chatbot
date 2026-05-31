@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Aanfarhan\Chatbot\Streaming;
 
-use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
-use Aanfarhan\Chatbot\Contracts\PersistableTool;
 use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Events\ChatbotMessageCompleted;
 use Aanfarhan\Chatbot\Events\ChatbotMessageFailed;
@@ -15,24 +13,20 @@ use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
-use Aanfarhan\Chatbot\Support\Truncator;
-use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
-use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Aanfarhan\Chatbot\Tools\NullToolResolver;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Support\Carbon;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class StreamCoordinator
 {
     private const CACHE_COUNTER_KEY = 'chatbot.active_streams';
-
-    private ?ToolArgumentValidator $argumentValidator = null;
 
     public function __construct(
         private readonly LLMClient $llm,
@@ -56,14 +50,19 @@ final class StreamCoordinator
         return $this->clock !== null ? ($this->clock)() : microtime(true);
     }
 
-    private function argumentValidator(): ToolArgumentValidator
+    private function toolInvoker(): ToolInvoker
     {
-        if ($this->argumentValidator === null) {
-            $raw = $this->config->get('chatbot.tools.default_max_arg_length', 10240);
-            $this->argumentValidator = new ToolArgumentValidator(is_int($raw) ? $raw : 10240);
-        }
+        $resolver = $this->toolRegistry ?? new NullToolResolver;
 
-        return $this->argumentValidator;
+        return new ToolInvoker(
+            resolver: $resolver,
+            invocationStore: $this->toolInvocationStore,
+            emitter: $this->emitter,
+            defaultTimeout: $this->defaultTimeout(),
+            resultSizeCap: $this->resultSizeCap(),
+            maxArgLength: $this->maxArgLength(),
+            clock: $this->clock,
+        );
     }
 
     /**
@@ -205,17 +204,17 @@ final class StreamCoordinator
                             continue;
                         }
 
-                        $toolStart = $this->now();
-                        $loopMessages[] = $this->invokeToolCall(
+                        $invokeResult = $this->toolInvoker()->invoke(
                             name: $tc['name'],
                             argumentsJson: $tc['arguments'],
                             callId: $tc['id'],
                             channel: $channel,
                             conversationId: $conversationId,
-                            allowedTools: $allowedTools,
                             actor: $actor,
+                            allowedTools: $allowedTools,
                         );
-                        $toolTimeSpent += $this->now() - $toolStart;
+                        $loopMessages[] = $invokeResult->message;
+                        $toolTimeSpent += $invokeResult->elapsedSeconds;
                         $callsThisTurn++;
                     }
 
@@ -331,109 +330,11 @@ final class StreamCoordinator
         return is_int($raw) ? $raw : 4096;
     }
 
-    /**
-     * @param  list<string>|null  $allowedTools
-     * @return array{role: string, tool_call_id: string, name: string, content: string}
-     */
-    private function invokeToolCall(string $name, string $argumentsJson, string $callId, string $channel, int $conversationId, ?array $allowedTools = null, ?Authenticatable $actor = null): array
+    private function maxArgLength(): int
     {
-        if ($allowedTools !== null && ! in_array($name, $allowedTools, true)) {
-            return [
-                'role' => 'tool',
-                'tool_call_id' => $callId,
-                'name' => $name,
-                'content' => "[error: tool '{$name}' is not permitted on this channel]",
-            ];
-        }
+        $raw = $this->config->get('chatbot.tools.default_max_arg_length', 10240);
 
-        $tool = $this->toolRegistry?->resolve($name);
-
-        if ($tool === null) {
-            return [
-                'role' => 'tool',
-                'tool_call_id' => $callId,
-                'name' => $name,
-                'content' => "[error: tool '{$name}' not found in registry]",
-            ];
-        }
-
-        $decoded = json_decode($argumentsJson, true);
-        /** @var array<string, mixed> $args */
-        $args = is_array($decoded) ? $decoded : [];
-
-        if (! $this->argumentValidator()->validate($tool->parameters(), $args)) {
-            $this->emitter->toolFailed($name);
-
-            $errorMsg = 'arguments did not match schema';
-            $this->persistInvocation($conversationId, $name, $args, '', 'rejected_schema', $errorMsg, now());
-
-            return [
-                'role' => 'tool',
-                'tool_call_id' => $callId,
-                'name' => $name,
-                'content' => $errorMsg,
-            ];
-        }
-
-        $invocation = new ToolInvocation(
-            args: $args,
-            channel: $channel,
-            context: [],
-        );
-
-        $this->emitter->toolStarted($name);
-
-        $startedAt = now();
-
-        try {
-            if (! $tool->authorize($actor, $invocation)) {
-                $this->emitter->toolFailed($name);
-
-                $errorMsg = "[error: not authorized to call tool '{$name}']";
-                $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', 'not authorized', $startedAt);
-
-                return [
-                    'role' => 'tool',
-                    'tool_call_id' => $callId,
-                    'name' => $name,
-                    'content' => $errorMsg,
-                ];
-            }
-
-            // The advisory budget is a measurement, not a control-flow gate (ADR-0006):
-            // we run the handler to completion, record whether it overran, and always
-            // feed the real result back to the model.
-            $deadline = $this->now() + $this->defaultTimeout();
-            $result = $tool->handle($actor, $invocation);
-            $overran = $this->now() > $deadline;
-
-            $encoded = is_array($result) ? json_encode($result, JSON_THROW_ON_ERROR) : (string) $result;
-
-            $encoded = Truncator::toByteCap($encoded, $this->resultSizeCap());
-
-            $this->emitter->toolFinished($name);
-
-            $this->persistToolSuccess($tool, $invocation, $conversationId, $name, $args, $result, $encoded, $startedAt, $overran);
-
-            return [
-                'role' => 'tool',
-                'tool_call_id' => $callId,
-                'name' => $name,
-                'content' => $encoded,
-            ];
-        } catch (\Throwable $e) {
-            $this->emitter->toolFailed($name);
-
-            $errorMsg = "[error: tool '{$name}' threw an exception: {$e->getMessage()}]";
-            $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', $e->getMessage(), $startedAt);
-
-            return [
-                'role' => 'tool',
-                'tool_call_id' => $callId,
-                'name' => $name,
-                'content' => $errorMsg,
-            ];
-        }
+        return is_int($raw) ? $raw : 10240;
     }
 
     private function incrementCounter(): void
@@ -450,73 +351,5 @@ final class StreamCoordinator
             $this->cache?->decrement(self::CACHE_COUNTER_KEY);
         } catch (\Throwable) {
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $args
-     * @param  array<string, mixed>|string  $rawResult
-     */
-    private function persistToolSuccess(
-        ChatbotTool $tool,
-        ToolInvocation $invocation,
-        int $conversationId,
-        string $name,
-        array $args,
-        array|string $rawResult,
-        string $encodedResult,
-        Carbon $startedAt,
-        bool $overran,
-    ): void {
-        if ($this->toolInvocationStore === null) {
-            return;
-        }
-
-        if ($tool instanceof PersistableTool) {
-            $payload = $tool->persist($invocation, $rawResult);
-            if ($payload === null) {
-                return;
-            }
-            $storedResult = json_encode($payload, JSON_THROW_ON_ERROR);
-        } else {
-            $storedResult = $encodedResult;
-        }
-
-        $this->toolInvocationStore->record(
-            conversationId: $conversationId,
-            messageId: null,
-            toolName: $name,
-            arguments: $args,
-            result: $storedResult,
-            status: 'ok',
-            error: null,
-            startedAt: $startedAt,
-            finishedAt: now(),
-            overran: $overran,
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>  $args
-     */
-    private function persistInvocation(
-        int $conversationId,
-        string $name,
-        array $args,
-        string $result,
-        string $status,
-        ?string $error,
-        Carbon $startedAt,
-    ): void {
-        $this->toolInvocationStore?->record(
-            conversationId: $conversationId,
-            messageId: null,
-            toolName: $name,
-            arguments: $args,
-            result: $result,
-            status: $status,
-            error: $error,
-            startedAt: $startedAt,
-            finishedAt: now(),
-        );
     }
 }

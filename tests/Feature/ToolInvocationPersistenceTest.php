@@ -11,6 +11,7 @@ use Aanfarhan\Chatbot\Tests\Stubs\FailingTool;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
 use Aanfarhan\Chatbot\Tests\Stubs\RedactingOrderTool;
 use Aanfarhan\Chatbot\Tests\Stubs\SkipPersistTool;
+use Aanfarhan\Chatbot\Tests\Stubs\UnauthorizedTool;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,8 +70,8 @@ it('coordinator writes a chatbot_tool_invocations row for a successful invocatio
 
 it('feeds the completed result to the model even when the tool overruns its advisory budget', function (): void {
     Chatbot::registerTool(LookupOrderTool::class);
-    // A 0s budget means any real handler work overruns it.
-    config()->set('chatbot.tools.default_timeout', 0);
+    // Deadline in the past — any handler work overruns it.
+    config()->set('chatbot.tools.default_timeout', -1);
 
     $fake = Chatbot::fake();
     $fake->respondWithToolCall('lookup_order', ['order_id' => 42], 'call_overrun');
@@ -120,7 +121,7 @@ it('feeds the completed result to the model even when the tool overruns its advi
 
 it('flags the tool-invocation record as overran when the handler exceeds its advisory budget', function (): void {
     Chatbot::registerTool(LookupOrderTool::class);
-    config()->set('chatbot.tools.default_timeout', 0);
+    config()->set('chatbot.tools.default_timeout', -1);
 
     $fake = Chatbot::fake();
     $fake->respondWithToolCall('lookup_order', ['order_id' => 42], 'call_overran_true');
@@ -502,6 +503,107 @@ it('stale invocations are excluded from history so the model re-calls the tool',
     ob_end_clean();
 
     $fake2->assertToolCalled('lookup_order', fn ($args) => $args['order_id'] === 7);
+});
+
+// --- New persisted rejection statuses ---
+
+it('coordinator writes a status=rejected_allowlist row when the tool is outside the verified allowlist', function (): void {
+    Chatbot::registerTool(LookupOrderTool::class);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('lookup_order', ['order_id' => 1], 'call_blocked');
+    $fake->respondWithStream(['Cannot help.']);
+
+    $store = app(ConversationStore::class);
+    $invocationStore = app(ToolInvocationStore::class);
+    $conversation = $store->start('default', null, null);
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+        toolInvocationStore: $invocationStore,
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'do it']],
+        conversationId: $conversation->id,
+        routeName: 'test',
+        contextHash: 'abc',
+        allowedTools: [],
+    )->sendContent();
+    ob_end_clean();
+
+    $all = DB::table('chatbot_tool_invocations')->where('conversation_id', $conversation->id)->get();
+    expect($all)->toHaveCount(1);
+    expect($all[0]->status)->toBe('rejected_allowlist');
+});
+
+it('coordinator writes a status=rejected_not_found row when the tool is not in the registry', function (): void {
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('ghost_tool', [], 'call_ghost');
+    $fake->respondWithStream(['Cannot help.']);
+
+    $store = app(ConversationStore::class);
+    $invocationStore = app(ToolInvocationStore::class);
+    $conversation = $store->start('default', null, null);
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+        toolInvocationStore: $invocationStore,
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'do it']],
+        conversationId: $conversation->id,
+        routeName: 'test',
+        contextHash: 'abc',
+        allowedTools: ['ghost_tool'],
+    )->sendContent();
+    ob_end_clean();
+
+    $all = DB::table('chatbot_tool_invocations')->where('conversation_id', $conversation->id)->get();
+    expect($all)->toHaveCount(1);
+    expect($all[0]->status)->toBe('rejected_not_found');
+});
+
+it('coordinator writes a status=rejected_unauthorized row when authorize returns false', function (): void {
+    Chatbot::registerTool(UnauthorizedTool::class);
+
+    $fake = Chatbot::fake();
+    $fake->respondWithToolCall('unauthorized_op', [], 'call_unauth');
+    $fake->respondWithStream(['Cannot help.']);
+
+    $store = app(ConversationStore::class);
+    $invocationStore = app(ToolInvocationStore::class);
+    $conversation = $store->start('default', null, null);
+
+    $coordinator = new StreamCoordinator(
+        llm: $fake,
+        store: $store,
+        config: app(ConfigRepository::class),
+        toolRegistry: app(ToolRegistry::class),
+        toolInvocationStore: $invocationStore,
+    );
+
+    ob_start();
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'do it']],
+        conversationId: $conversation->id,
+        routeName: 'test',
+        contextHash: 'abc',
+    )->sendContent();
+    ob_end_clean();
+
+    $all = DB::table('chatbot_tool_invocations')->where('conversation_id', $conversation->id)->get();
+    expect($all)->toHaveCount(1);
+    expect($all[0]->status)->toBe('rejected_unauthorized');
 });
 
 /**

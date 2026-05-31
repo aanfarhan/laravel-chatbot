@@ -49,6 +49,39 @@ the migration regardless of the number it ships under.
   latent coupling on session middleware; no host change is needed. Noted for
   completeness.
 
+## Next — Tool-invocation rejection paths now persist audit records
+
+Previously, allowlist rejections (`tool not permitted on this channel`) and
+not-found rejections (`tool not found in registry`) silently returned an error
+message to the model without writing a `chatbot_tool_invocations` row. Starting
+with this release every invocation path persists a record.
+
+### New `InvocationStatus` values
+
+`ToolInvocationStore::record()` now receives one of six status strings:
+
+| Status | When written |
+|---|---|
+| `ok` | Handler ran to completion (unchanged) |
+| `rejected_schema` | Arguments failed JSON-schema validation (unchanged) |
+| `handler_error` | Handler threw an exception (unchanged) |
+| `rejected_allowlist` | Tool name not in the verified channel allowlist — **new, previously un-persisted** |
+| `rejected_not_found` | Tool name not registered — **new, previously un-persisted** |
+| `rejected_unauthorized` | `authorize()` returned `false` — **new status string; was `handler_error` in prior releases** |
+
+### Migration
+
+If your application queries `chatbot_tool_invocations` and filters by
+`status = 'handler_error'` expecting to catch unauthorized calls, update that
+query to also include `status = 'rejected_unauthorized'`.
+
+If your application asserts **no row** is written when a tool call is rejected
+by the allowlist or registry, those assertions must be updated — a record is
+now written for every invocation path.
+
+No schema migration is required: the `status` column already stores an
+arbitrary string.
+
 ## 1.4.0 — Minimum PHP lowered to 8.2
 
 No action required. The minimum PHP version dropped from 8.3 to 8.2 to widen
