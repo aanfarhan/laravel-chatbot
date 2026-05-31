@@ -11,7 +11,7 @@ use Aanfarhan\Chatbot\Tests\Stubs\FailingTool;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
 use Aanfarhan\Chatbot\Tests\Stubs\MultibyteResultTool;
 use Aanfarhan\Chatbot\Tests\Stubs\UnauthorizedTool;
-use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Pest\Expectation;
@@ -79,7 +79,7 @@ it('runs the tool-call loop: tool called, result fed back, model emits prose', f
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -125,7 +125,7 @@ it('assertToolNotCalled passes when the tool was never invoked', function (): vo
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -156,7 +156,7 @@ it('feeds back an error tool message when authorize returns false, stream comple
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -199,7 +199,7 @@ it('feeds back an error tool message when the handler throws, stream completes n
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -241,7 +241,7 @@ it('truncates tool results over 4096 bytes with [truncated] suffix', function ()
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -294,7 +294,7 @@ it('keeps a truncated tool result within the configured result_size_cap', functi
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -327,7 +327,7 @@ it('never splits a multi-byte character when truncating a tool result', function
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -371,7 +371,7 @@ it('emits a budget-exhausted tool message and allows model to produce final pros
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -414,7 +414,7 @@ it('emits tool_started and tool_finished events in order around a successful too
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -458,7 +458,7 @@ it('emits tool_started and tool_failed when the handler throws', function (): vo
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();

@@ -15,11 +15,14 @@ use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
 use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
 use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
+use Aanfarhan\Chatbot\Streaming\SseStreamEmitter;
+use Aanfarhan\Chatbot\Streaming\StreamEmitter;
 use Aanfarhan\Chatbot\Testing\Fixtures\FailingTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvocationReplay;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Contracts\Config\Repository;
@@ -88,6 +91,25 @@ final class ChatbotServiceProvider extends ServiceProvider
                 );
             },
         );
+
+        $this->app->singleton(StreamEmitter::class, fn (): StreamEmitter => new SseStreamEmitter);
+
+        $this->app->singleton(ToolInvoker::class, function (Application $app): ToolInvoker {
+            /** @var Repository $config */
+            $config = $app->make('config');
+            $defaultTimeout = $config->get('chatbot.tools.default_timeout', 10);
+            $resultSizeCap = $config->get('chatbot.tools.result_size_cap', 4096);
+            $maxArgLength = $config->get('chatbot.tools.default_max_arg_length', 10240);
+
+            return new ToolInvoker(
+                resolver: $app->make(ToolRegistry::class),
+                invocationStore: $app->make(ToolInvocationStore::class),
+                emitter: $app->make(StreamEmitter::class),
+                defaultTimeout: is_int($defaultTimeout) ? $defaultTimeout : 10,
+                resultSizeCap: is_int($resultSizeCap) ? $resultSizeCap : 4096,
+                maxArgLength: is_int($maxArgLength) ? $maxArgLength : 10240,
+            );
+        });
 
         $this->app->singleton(LLMClient::class, function (Application $app): LLMClient {
             /** @var Repository $config */

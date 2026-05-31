@@ -12,7 +12,7 @@ use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
 use Aanfarhan\Chatbot\Tests\Stubs\RedactingOrderTool;
 use Aanfarhan\Chatbot\Tests\Stubs\SkipPersistTool;
 use Aanfarhan\Chatbot\Tests\Stubs\UnauthorizedTool;
-use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -42,8 +42,7 @@ it('coordinator writes a chatbot_tool_invocations row for a successful invocatio
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -85,8 +84,7 @@ it('feeds the completed result to the model even when the tool overruns its advi
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -135,8 +133,7 @@ it('flags the tool-invocation record as overran when the handler exceeds its adv
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -169,8 +166,7 @@ it('records overran=false for an invocation that completes within its advisory b
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -204,8 +200,7 @@ it('coordinator writes a status=handler_error row when the handler throws', func
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -240,8 +235,7 @@ it('skips the DB write when persist() returns null', function (): void {
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -274,8 +268,7 @@ it('stores the sanitized payload from persist() instead of the original result',
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -402,8 +395,7 @@ it('second turn includes fresh tool result in history so the model does not re-i
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -428,8 +420,7 @@ it('second turn includes fresh tool result in history so the model does not re-i
         llm: $fake2,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     // Build history from fresh invocations (simulating what MessagesController does)
@@ -488,8 +479,7 @@ it('stale invocations are excluded from history so the model re-calls the tool',
         llm: $fake2,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -522,8 +512,7 @@ it('coordinator writes a status=rejected_allowlist row when the tool is outside 
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -554,8 +543,7 @@ it('coordinator writes a status=rejected_not_found row when the tool is not in t
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -588,8 +576,7 @@ it('coordinator writes a status=rejected_unauthorized row when authorize returns
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();

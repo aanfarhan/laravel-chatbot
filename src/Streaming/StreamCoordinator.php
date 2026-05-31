@@ -6,16 +6,13 @@ namespace Aanfarhan\Chatbot\Streaming;
 
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
-use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Events\ChatbotMessageCompleted;
 use Aanfarhan\Chatbot\Events\ChatbotMessageFailed;
 use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
-use Aanfarhan\Chatbot\Tools\NullToolResolver;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
-use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
@@ -35,10 +32,9 @@ final class StreamCoordinator
         private readonly ?CacheRepository $cache = null,
         private readonly ?Dispatcher $events = null,
         private readonly ?LoggerInterface $logger = null,
-        private readonly ?ToolRegistry $toolRegistry = null,
-        private readonly ?ToolInvocationStore $toolInvocationStore = null,
         private readonly ?Closure $clock = null,
         private readonly StreamEmitter $emitter = new SseStreamEmitter,
+        private readonly ?ToolInvoker $toolInvoker = null,
     ) {}
 
     /**
@@ -48,21 +44,6 @@ final class StreamCoordinator
     private function now(): float
     {
         return $this->clock !== null ? ($this->clock)() : microtime(true);
-    }
-
-    private function toolInvoker(): ToolInvoker
-    {
-        $resolver = $this->toolRegistry ?? new NullToolResolver;
-
-        return new ToolInvoker(
-            resolver: $resolver,
-            invocationStore: $this->toolInvocationStore,
-            emitter: $this->emitter,
-            defaultTimeout: $this->defaultTimeout(),
-            resultSizeCap: $this->resultSizeCap(),
-            maxArgLength: $this->maxArgLength(),
-            clock: $this->clock,
-        );
     }
 
     /**
@@ -204,7 +185,13 @@ final class StreamCoordinator
                             continue;
                         }
 
-                        $invokeResult = $this->toolInvoker()->invoke(
+                        if ($this->toolInvoker === null) {
+                            $loopMessages[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'name' => $tc['name'], 'content' => '[error: no tool handler configured]'];
+
+                            continue;
+                        }
+
+                        $invokeResult = $this->toolInvoker->invoke(
                             name: $tc['name'],
                             argumentsJson: $tc['arguments'],
                             callId: $tc['id'],
@@ -294,19 +281,11 @@ final class StreamCoordinator
     private function resolveToolDefs(?array $allowedTools): array
     {
         $supportsTools = $this->config->get('chatbot.provider.supports_tools', true);
-        if ($supportsTools === false) {
+        if ($supportsTools === false || $this->toolInvoker === null) {
             return [];
         }
 
-        if ($this->toolRegistry === null) {
-            return [];
-        }
-
-        if ($allowedTools === null) {
-            return $this->toolRegistry->toDefinitions();
-        }
-
-        return $this->toolRegistry->toDefinitionsFor($allowedTools);
+        return $this->toolInvoker->definitions($allowedTools);
     }
 
     private function maxCallsPerTurn(): int
@@ -314,27 +293,6 @@ final class StreamCoordinator
         $raw = $this->config->get('chatbot.tools.max_calls_per_turn', 5);
 
         return is_int($raw) ? $raw : 5;
-    }
-
-    private function defaultTimeout(): int
-    {
-        $raw = $this->config->get('chatbot.tools.default_timeout', 10);
-
-        return is_int($raw) ? $raw : 10;
-    }
-
-    private function resultSizeCap(): int
-    {
-        $raw = $this->config->get('chatbot.tools.result_size_cap', 4096);
-
-        return is_int($raw) ? $raw : 4096;
-    }
-
-    private function maxArgLength(): int
-    {
-        $raw = $this->config->get('chatbot.tools.default_max_arg_length', 10240);
-
-        return is_int($raw) ? $raw : 10240;
     }
 
     private function incrementCounter(): void

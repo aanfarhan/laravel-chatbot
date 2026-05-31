@@ -9,6 +9,7 @@ use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvocationReplay;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -253,8 +254,7 @@ it('after a schema change, replay drops stale records and the model re-calls the
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();

@@ -5,8 +5,10 @@ declare(strict_types=1);
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Facades\Chatbot;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
+use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\SlowTool;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 
@@ -61,8 +63,16 @@ it('excludes tool execution time from the stream budget so a slow tool still yie
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
         clock: $clock,
+        toolInvoker: new ToolInvoker(
+            resolver: app(ToolRegistry::class),
+            invocationStore: null,
+            emitter: new RecordingStreamEmitter,
+            defaultTimeout: 10,
+            resultSizeCap: 4096,
+            maxArgLength: 10240,
+            clock: $clock,
+        ),
     );
 
     ob_start();
@@ -109,8 +119,16 @@ it('still cuts a runaway loop whose accumulated model-stream time exceeds the bu
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
         clock: $clock,
+        toolInvoker: new ToolInvoker(
+            resolver: app(ToolRegistry::class),
+            invocationStore: null,
+            emitter: new RecordingStreamEmitter,
+            defaultTimeout: 10,
+            resultSizeCap: 4096,
+            maxArgLength: 10240,
+            clock: $clock,
+        ),
     );
 
     ob_start();

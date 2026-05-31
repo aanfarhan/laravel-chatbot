@@ -9,6 +9,7 @@ use Aanfarhan\Chatbot\Contracts\ToolResolver;
 use Aanfarhan\Chatbot\Persistence\ToolInvocationRecord;
 use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Tools\InvocationStatus;
+use Aanfarhan\Chatbot\Tools\NullToolResolver;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -75,6 +76,11 @@ function makeResolver(?ChatbotTool $tool): ToolResolver
         {
             return $this->tool;
         }
+
+        public function definitions(?array $allowedTools): array
+        {
+            return [];
+        }
     };
 }
 
@@ -129,6 +135,24 @@ function makeInvoker(
         maxArgLength: $maxArgLength,
     );
 }
+
+// ---------------------------------------------------------------------------
+// definitions(): delegates to resolver
+// ---------------------------------------------------------------------------
+
+it('definitions() returns empty list when the resolver has no tools', function (): void {
+    $invoker = new ToolInvoker(
+        resolver: new NullToolResolver,
+        invocationStore: null,
+        emitter: new RecordingStreamEmitter,
+        defaultTimeout: 10,
+        resultSizeCap: 4096,
+        maxArgLength: 10240,
+    );
+
+    expect($invoker->definitions(null))->toBe([]);
+    expect($invoker->definitions(['foo']))->toBe([]);
+});
 
 // ---------------------------------------------------------------------------
 // Tracer bullet: ok path

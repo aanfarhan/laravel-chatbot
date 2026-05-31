@@ -13,4 +13,10 @@ final class NullToolResolver implements ToolResolver
     {
         return null;
     }
+
+    /** @param  list<string>|null  $allowedTools */
+    public function definitions(?array $allowedTools): array
+    {
+        return [];
+    }
 }

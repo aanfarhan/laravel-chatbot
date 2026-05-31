@@ -12,7 +12,7 @@ use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\FailingTool;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
-use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Pest\Expectation;
@@ -155,7 +155,7 @@ it('StreamCoordinator only sends registry ∩ allowlist tool definitions to the 
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -187,7 +187,7 @@ it('StreamCoordinator sends no tools when allowlist is empty', function (): void
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -220,7 +220,7 @@ it('tool call for name outside verified allowlist feeds back an error message', 
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -263,7 +263,7 @@ it('tool call for allowed name absent from registry feeds back an error message'
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -307,7 +307,7 @@ it('two channels with different allowlists see disjoint tool definitions', funct
         llm: $fakeA,
         store: $storeA,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -330,7 +330,7 @@ it('two channels with different allowlists see disjoint tool definitions', funct
         llm: $fakeB,
         store: $storeB,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();

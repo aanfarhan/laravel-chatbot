@@ -8,7 +8,7 @@ use Aanfarhan\Chatbot\Facades\Chatbot;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\SpyLookupTool;
-use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -75,7 +75,7 @@ it('short-circuits authorize and handle, feeds back synthetic schema-rejection m
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -122,8 +122,7 @@ it('persists a rejected_schema row with the raw args and an empty result', funct
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
-        toolInvocationStore: $invocationStore,
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -162,7 +161,7 @@ it('rejections count against max_calls_per_turn and trigger the budget-exhausted
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();

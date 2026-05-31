@@ -3,10 +3,15 @@
 declare(strict_types=1);
 
 use Aanfarhan\Chatbot\Clients\FakeClient;
+use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
+use Aanfarhan\Chatbot\Contracts\ToolResolver;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
+use Aanfarhan\Chatbot\Tools\ToolInvocation;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 
@@ -248,4 +253,95 @@ it('persists the assistant message but omits its id from the done event', functi
 
     expect($done['event'])->toBe('done');
     expect(json_decode($done['data'], true))->not->toHaveKey('message_id');
+});
+
+it('uses the injected ToolInvoker emitter events when a tool call arrives', function (): void {
+    $emitter = new RecordingStreamEmitter;
+
+    $resolvedTool = new class implements ChatbotTool
+    {
+        public function name(): string
+        {
+            return 'ping';
+        }
+
+        public function description(): string
+        {
+            return 'ping';
+        }
+
+        /** @return array<string, mixed> */
+        public function parameters(): array
+        {
+            return ['type' => 'object', 'properties' => []];
+        }
+
+        public function authorize(?Authenticatable $actor, ToolInvocation $inv): bool
+        {
+            return true;
+        }
+
+        public function handle(?Authenticatable $actor, ToolInvocation $inv): string
+        {
+            return 'pong';
+        }
+    };
+
+    $resolver = new class($resolvedTool) implements ToolResolver
+    {
+        public function __construct(private ChatbotTool $tool) {}
+
+        public function resolve(string $name): ?ChatbotTool
+        {
+            return $this->tool;
+        }
+
+        public function definitions(?array $allowedTools): array
+        {
+            return [['type' => 'function', 'function' => ['name' => 'ping', 'description' => 'ping', 'parameters' => ['type' => 'object', 'properties' => []]]]];
+        }
+    };
+
+    $invoker = new ToolInvoker(
+        resolver: $resolver,
+        invocationStore: null,
+        emitter: $emitter,
+        defaultTimeout: 10,
+        resultSizeCap: 4096,
+        maxArgLength: 10240,
+    );
+
+    $client = new FakeClient;
+    $client->respondWithToolCall('ping', [], 'call_1');
+    $client->respondWithStream(['ok']);
+
+    $store = Mockery::mock(ConversationStore::class);
+    $store->shouldReceive('append')->andReturn(makeMessageRecord());
+
+    $config = Mockery::mock(ConfigRepository::class);
+    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
+    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
+    $config->shouldReceive('get')->with('chatbot.tools.max_calls_per_turn', 5)->andReturn(5);
+
+    $coordinator = new StreamCoordinator(
+        llm: $client,
+        store: $store,
+        config: $config,
+        emitter: $emitter,
+        toolInvoker: $invoker,
+    );
+
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'ping']],
+        conversationId: 1,
+        routeName: 'test',
+        contextHash: 'abc',
+        isAborted: fn () => false,
+    )->sendContent();
+
+    $eventTypes = array_column($emitter->events(), 'event');
+    expect($eventTypes)->toContain('tool_started');
+    expect($eventTypes)->toContain('tool_finished');
+    expect($eventTypes)->toContain('done');
 });

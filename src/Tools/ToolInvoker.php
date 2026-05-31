@@ -30,6 +30,15 @@ final class ToolInvoker
         $this->validator = new ToolArgumentValidator($maxArgLength);
     }
 
+    /**
+     * @param  list<string>|null  $allowedTools
+     * @return list<array<string, mixed>>
+     */
+    public function definitions(?array $allowedTools): array
+    {
+        return $this->resolver->definitions($allowedTools);
+    }
+
     private function now(): float
     {
         return $this->clock !== null ? ($this->clock)() : microtime(true);

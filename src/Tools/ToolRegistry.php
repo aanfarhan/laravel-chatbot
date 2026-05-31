@@ -130,6 +130,17 @@ final class ToolRegistry implements ToolResolver
         return $defs;
     }
 
+    /**
+     * @param  list<string>|null  $allowedTools
+     * @return list<array<string, mixed>>
+     */
+    public function definitions(?array $allowedTools): array
+    {
+        return $allowedTools === null
+            ? $this->toDefinitions()
+            : $this->toDefinitionsFor($allowedTools);
+    }
+
     public function isEmpty(): bool
     {
         return $this->tools === [];

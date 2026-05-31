@@ -7,7 +7,7 @@ use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
-use Aanfarhan\Chatbot\Tools\ToolRegistry;
+use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Pest\Expectation;
@@ -75,7 +75,7 @@ it('sends no tool defs to the LLM when supports_tools is false', function (): vo
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
@@ -104,7 +104,7 @@ it('sends tool defs normally when supports_tools is true', function (): void {
         llm: $fake,
         store: $store,
         config: app(ConfigRepository::class),
-        toolRegistry: app(ToolRegistry::class),
+        toolInvoker: app(ToolInvoker::class),
     );
 
     ob_start();
