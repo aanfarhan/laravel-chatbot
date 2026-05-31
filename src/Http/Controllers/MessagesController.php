@@ -213,7 +213,7 @@ final class MessagesController
             $existing = $this->store->findByUuid($uuid);
             if ($existing
                 && $this->withinIdleWindow($existing, $ttl)
-                && $this->ownsConversation($existing, $userId, $guestToken)) {
+                && $existing->ownedBy($userId, $guestToken)) {
                 return $existing;
             }
         }
@@ -223,24 +223,6 @@ final class MessagesController
             userId: $userId !== null ? (int) $userId : null,
             guestToken: $guestToken,
         );
-    }
-
-    /**
-     * Mirror the history endpoint's ownership predicate before a cookie-named
-     * conversation is reused on the append path. An authenticated requester is
-     * matched on host user identity only; a guest on guest token only; the two
-     * are never cross-honoured, and a conversation owned by neither party
-     * (e.g. post-anonymization) is reusable by no one. A failure is silent —
-     * the caller falls through to starting a fresh conversation, so the
-     * presented identifier yields no enumeration oracle.
-     */
-    private function ownsConversation(ConversationRecord $conversation, ?string $userId, ?string $guestToken): bool
-    {
-        return match (true) {
-            $conversation->userId !== null => $userId !== null && (int) $userId === $conversation->userId,
-            $conversation->guestToken !== null => $guestToken !== null && $guestToken === $conversation->guestToken,
-            default => false,
-        };
     }
 
     private function withinIdleWindow(ConversationRecord $conversation, int $ttl): bool

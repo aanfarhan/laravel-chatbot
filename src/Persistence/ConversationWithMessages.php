@@ -6,6 +6,8 @@ namespace Aanfarhan\Chatbot\Persistence;
 
 final readonly class ConversationWithMessages
 {
+    use HasOwnership;
+
     /**
      * @param  MessageRecord[]  $messages
      */

@@ -42,16 +42,10 @@ final class HistoryController
             throw new HttpException(404, 'Conversation not found');
         }
 
-        $guestToken = $request->cookie('chatbot_guest_id');
-        $userId = $verified->userId;
+        $rawCookie = $request->cookie('chatbot_guest_id');
+        $guestToken = is_string($rawCookie) && $rawCookie !== '' ? $rawCookie : null;
 
-        $authorized = match (true) {
-            $conversation->userId !== null => $userId !== null && (int) $userId === $conversation->userId,
-            $conversation->guestToken !== null => is_string($guestToken) && $guestToken === $conversation->guestToken,
-            default => false,
-        };
-
-        if (! $authorized) {
+        if (! $conversation->ownedBy($verified->userId, $guestToken)) {
             throw new HttpException(403, 'Forbidden');
         }
 
