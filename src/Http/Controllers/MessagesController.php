@@ -7,24 +7,16 @@ namespace Aanfarhan\Chatbot\Http\Controllers;
 use Aanfarhan\Chatbot\Chatbot;
 use Aanfarhan\Chatbot\Config\ChannelSettings;
 use Aanfarhan\Chatbot\Config\Defaults;
-use Aanfarhan\Chatbot\ContextSanitizer;
-use Aanfarhan\Chatbot\Contracts\ConversationStore;
-use Aanfarhan\Chatbot\ConversationReplay;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
 use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
-use Aanfarhan\Chatbot\Extractors\ClientExtractorPayload;
-use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
-use Aanfarhan\Chatbot\Persistence\ConversationRecord;
-use Aanfarhan\Chatbot\PromptAssembler;
+use Aanfarhan\Chatbot\Exceptions\InvalidExtractorPayloadException;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
-use Aanfarhan\Chatbot\ThreadedActorResolver;
-use Aanfarhan\Chatbot\TokenCounter;
+use Aanfarhan\Chatbot\TurnIntake;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -32,17 +24,12 @@ final class MessagesController
 {
     public function __construct(
         private readonly ContextEnvelope $envelope,
-        private readonly PromptAssembler $assembler,
-        private readonly ContextSanitizer $sanitizer,
-        private readonly Repository $config,
-        private readonly ConversationStore $store,
         private readonly Chatbot $chatbot,
         private readonly RateLimiter $rateLimiter,
-        private readonly ConversationReplay $replay,
-        private readonly TokenCounter $tokenCounter,
-        private readonly ThreadedActorResolver $actorResolver,
         private readonly StreamCoordinator $coordinator,
+        private readonly Repository $config,
         private readonly ChannelSettings $channelSettings,
+        private readonly TurnIntake $turnIntake,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -69,68 +56,30 @@ final class MessagesController
 
         $ttl = $this->config->integer('chatbot.conversation_ttl', Defaults::CONVERSATION_TTL);
 
-        $guestToken = null;
-        if ($verified->userId === null) {
-            $rawToken = $request->cookie('chatbot_guest_id');
-            $guestToken = is_string($rawToken) && $rawToken !== '' ? $rawToken : Str::random(40);
-        }
-
-        $conversation = $this->resolveConversation($request, $verified->channel, $ttl, $verified->userId, $guestToken);
-
         $message = $request->string('message')->toString();
 
         $rawExtractorBlocks = $request->input('extractor_blocks', []);
-        $rawExtractorBlocks = is_array($rawExtractorBlocks) ? array_values($rawExtractorBlocks) : [];
+        $extractorBlocks = is_array($rawExtractorBlocks) ? array_values($rawExtractorBlocks) : [];
 
-        $payloadNormaliser = $verified->extractorSizeCapBytes !== null
-            ? new ClientExtractorPayload(outputSizeCap: $verified->extractorSizeCapBytes)
-            : new ClientExtractorPayload;
+        $guestCookie = $request->cookie('chatbot_guest_id');
+        $guestCookie = is_string($guestCookie) && $guestCookie !== '' ? $guestCookie : null;
+
+        $conversationCookieName = 'chatbot_conversation_'.$verified->channel;
+        $conversationCookie = $request->cookie($conversationCookieName);
+        $conversationCookie = is_string($conversationCookie) && $conversationCookie !== '' ? $conversationCookie : null;
 
         try {
-            $extractorResults = $payloadNormaliser->normalise(
-                $rawExtractorBlocks,
-                $verified->allowedExtractors,
-                app(ClientExtractorRegistry::class),
+            $prepared = $this->turnIntake->prepare(
+                verified: $verified,
+                message: $message,
+                extractorBlocks: $extractorBlocks,
+                guestCookie: $guestCookie,
+                conversationCookie: $conversationCookie,
+                ttl: $ttl,
             );
-        } catch (\RuntimeException $e) {
+        } catch (InvalidExtractorPayloadException $e) {
             return new JsonResponse(['error' => $e->getMessage()], 422);
         }
-
-        /** @var array<string, mixed> $channelConfig */
-        $channelConfig = (array) $this->config->get('chatbot.channels.'.$verified->channel, []);
-
-        $model = $this->channelSettings->model($verified->channel);
-
-        $sanitizedPayload = $this->sanitizer->sanitize($verified->payload);
-        $contextHash = hash('sha256', (string) json_encode($sanitizedPayload));
-
-        $routeOverrides = $verified->prompt !== null ? ['prompt' => $verified->prompt] : [];
-
-        $freshness = $this->channelSettings->freshnessWindow($verified->channel);
-
-        $history = $this->replay->historyFor($conversation, $freshness);
-
-        $messages = $this->assembler->assemble(
-            channelConfig: $channelConfig,
-            routeOverrides: $routeOverrides,
-            contextPayload: $sanitizedPayload,
-            history: $history,
-            userMessage: $message,
-            allowedExtractors: $verified->allowedExtractors,
-            extractorResults: $extractorResults,
-        );
-
-        $messages = $this->tokenCounter->prune($messages, $this->config->integer('chatbot.token_cap', Defaults::TOKEN_CAP));
-
-        $this->store->append(
-            conversationId: $conversation->id,
-            role: 'user',
-            content: $message,
-            routeName: $verified->route,
-            contextHash: $contextHash,
-        );
-
-        $actor = $this->actorResolver->reconstitute($verified->userId);
 
         $quotaPreflight = function () use ($request): void {
             $quota = $this->chatbot->resolveQuota($request);
@@ -139,31 +88,32 @@ final class MessagesController
             }
         };
 
-        $cookieName = 'chatbot_conversation_'.$verified->channel;
         $minuteTtl = (int) ceil($ttl / 60);
 
         $streamed = $this->coordinator->handle(
-            messages: $messages,
-            conversationId: $conversation->id,
-            conversationUuid: $conversation->uuid,
+            messages: $prepared->messages,
+            conversationId: $prepared->conversation->id,
+            conversationUuid: $prepared->conversation->uuid,
             routeName: $verified->route,
-            contextHash: $contextHash,
-            model: $model,
+            contextHash: $prepared->contextHash,
+            model: $prepared->model,
             preflight: $quotaPreflight,
             contextSummary: $verified->summary,
             channel: $verified->channel,
             allowedTools: $verified->allowedTools,
-            actor: $actor,
+            actor: $prepared->actor,
         );
 
         $streamed->headers->set('Content-Type', 'text/event-stream; charset=UTF-8');
         $streamed->headers->set('Cache-Control', 'no-cache');
         $streamed->headers->set('X-Accel-Buffering', 'no');
-        $streamed->headers->setCookie(cookie($cookieName, $conversation->uuid, $minuteTtl, '/chatbot'));
+        $streamed->headers->setCookie(
+            cookie($conversationCookieName, $prepared->conversation->uuid, $minuteTtl, '/chatbot'),
+        );
 
-        if ($guestToken !== null) {
+        if ($prepared->guestToken !== null) {
             $streamed->headers->setCookie(
-                cookie('chatbot_guest_id', $guestToken, 60 * 24 * 365, '/chatbot', null, false, true),
+                cookie('chatbot_guest_id', $prepared->guestToken, 60 * 24 * 365, '/chatbot', null, false, true),
             );
         }
 
@@ -196,41 +146,5 @@ final class MessagesController
         $this->rateLimiter->hit("{$base}:day", 86400);
 
         return null;
-    }
-
-    private function resolveConversation(
-        Request $request,
-        string $channel,
-        int $ttl,
-        ?string $userId,
-        ?string $guestToken,
-    ): ConversationRecord {
-        $cookieName = 'chatbot_conversation_'.$channel;
-        $rawId = $request->cookie($cookieName);
-        $uuid = is_string($rawId) && $rawId !== '' ? $rawId : null;
-
-        if ($uuid !== null) {
-            $existing = $this->store->findByUuid($uuid);
-            if ($existing
-                && $this->withinIdleWindow($existing, $ttl)
-                && $existing->ownedBy($userId, $guestToken)) {
-                return $existing;
-            }
-        }
-
-        return $this->store->start(
-            channel: $channel,
-            userId: $userId !== null ? (int) $userId : null,
-            guestToken: $guestToken,
-        );
-    }
-
-    private function withinIdleWindow(ConversationRecord $conversation, int $ttl): bool
-    {
-        if ($conversation->lastMessageAt === null) {
-            return true;
-        }
-
-        return $conversation->lastMessageAt >= now()->subSeconds($ttl);
     }
 }

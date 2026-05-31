@@ -99,6 +99,26 @@ final class ChatbotServiceProvider extends ServiceProvider
 
         $this->app->singleton(ThreadedActorResolver::class, fn (Application $app): ThreadedActorResolver => new ThreadedActorResolver($app->make('auth')));
 
+        $this->app->singleton(
+            TurnIntake::class,
+            function (Application $app): TurnIntake {
+                /** @var Repository $config */
+                $config = $app->make('config');
+
+                return new TurnIntake(
+                    assembler: $app->make(PromptAssembler::class),
+                    sanitizer: $app->make(ContextSanitizer::class),
+                    store: $app->make(ConversationStore::class),
+                    replay: $app->make(ConversationReplay::class),
+                    tokenCounter: $app->make(TokenCounter::class),
+                    actorResolver: $app->make(ThreadedActorResolver::class),
+                    extractorRegistry: $app->make(ClientExtractorRegistry::class),
+                    channelSettings: $app->make(ChannelSettings::class),
+                    config: $config,
+                );
+            },
+        );
+
         $this->app->singleton(StreamEmitter::class, fn (): StreamEmitter => new SseStreamEmitter);
 
         $this->app->singleton(ToolInvoker::class, function (Application $app): ToolInvoker {
