@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
+use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -185,6 +186,37 @@ it('emits token events then done for a three-chunk stream', function (): void {
     expect(json_decode($events[2]['data'], true)['content'])->toBe('!');
 
     expect($events[3]['event'])->toBe('done');
+});
+
+it('emits token and done via recording emitter without ob_start', function (): void {
+    $client = new FakeClient;
+    $client->respondWithStream(['Hel', 'lo']);
+
+    $store = Mockery::mock(ConversationStore::class);
+    $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
+
+    $config = Mockery::mock(ConfigRepository::class);
+    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
+    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
+    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
+
+    $emitter = new RecordingStreamEmitter;
+    $coordinator = new StreamCoordinator($client, $store, $config, emitter: $emitter);
+
+    $coordinator->handle(
+        messages: [['role' => 'user', 'content' => 'hi']],
+        conversationId: 1,
+        routeName: 'test',
+        contextHash: 'abc',
+        isAborted: fn () => false,
+    )->sendContent();
+
+    $events = $emitter->events();
+
+    expect(array_column($events, 'event'))->toBe(['token', 'token', 'done']);
+    expect($events[0]['content'])->toBe('Hel');
+    expect($events[1]['content'])->toBe('lo');
+    expect($events[2]['conversation_id'])->toBe('');
 });
 
 it('persists the assistant message but omits its id from the done event', function (): void {

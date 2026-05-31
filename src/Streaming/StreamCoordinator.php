@@ -44,6 +44,7 @@ final class StreamCoordinator
         private readonly ?ToolRegistry $toolRegistry = null,
         private readonly ?ToolInvocationStore $toolInvocationStore = null,
         private readonly ?Closure $clock = null,
+        private readonly StreamEmitter $emitter = new SseStreamEmitter,
     ) {}
 
     /**
@@ -126,7 +127,7 @@ final class StreamCoordinator
                 }
 
                 if ($contextSummary !== null) {
-                    $this->emit('context_summary', ['summary' => $contextSummary]);
+                    $this->emitter->contextSummary($contextSummary);
                 }
 
                 $toolDefs = $this->resolveToolDefs($allowedTools);
@@ -168,7 +169,7 @@ final class StreamCoordinator
                         if ($chunk->content !== '') {
                             $iterText .= $chunk->content;
                             $assembled .= $chunk->content;
-                            $this->emit('token', ['content' => $chunk->content]);
+                            $this->emitter->token($chunk->content);
                         }
 
                         if ($chunk->usage !== null) {
@@ -224,11 +225,7 @@ final class StreamCoordinator
                 }
             } catch (ChatbotException $e) {
                 $chatbotException = $e;
-                $this->emit('error', [
-                    'code' => $e->code(),
-                    'message' => $e->getMessage(),
-                    'retryable' => $e->isRetryable(),
-                ]);
+                $this->emitter->error($e->code(), $e->getMessage(), $e->isRetryable());
 
                 if ($this->events !== null) {
                     $this->events->dispatch(new ChatbotMessageFailed(
@@ -271,13 +268,11 @@ final class StreamCoordinator
                     $logContext['error_code'] = $chatbotException->code();
                     $this->logger?->info('[chatbot] turn failed', $logContext);
                 } else {
-                    $this->emit('done', [
-                        'conversation_id' => $conversationUuid,
-                        'usage' => [
-                            'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
-                            'output_tokens' => $usage !== null ? $usage->outputTokens : 0,
-                        ],
-                    ]);
+                    $this->emitter->done(
+                        $conversationUuid,
+                        $usage !== null ? $usage->inputTokens : 0,
+                        $usage !== null ? $usage->outputTokens : 0,
+                    );
 
                     if ($this->events !== null) {
                         $this->events->dispatch(new ChatbotMessageCompleted(
@@ -367,7 +362,7 @@ final class StreamCoordinator
         $args = is_array($decoded) ? $decoded : [];
 
         if (! $this->argumentValidator()->validate($tool->parameters(), $args)) {
-            $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+            $this->emitter->toolFailed($name);
 
             $errorMsg = 'arguments did not match schema';
             $this->persistInvocation($conversationId, $name, $args, '', 'rejected_schema', $errorMsg, now());
@@ -386,13 +381,13 @@ final class StreamCoordinator
             context: [],
         );
 
-        $this->emit('tool_started', ['name' => $name, 'phase' => 'started']);
+        $this->emitter->toolStarted($name);
 
         $startedAt = now();
 
         try {
             if (! $tool->authorize($actor, $invocation)) {
-                $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+                $this->emitter->toolFailed($name);
 
                 $errorMsg = "[error: not authorized to call tool '{$name}']";
                 $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', 'not authorized', $startedAt);
@@ -416,7 +411,7 @@ final class StreamCoordinator
 
             $encoded = Truncator::toByteCap($encoded, $this->resultSizeCap());
 
-            $this->emit('tool_finished', ['name' => $name, 'phase' => 'finished']);
+            $this->emitter->toolFinished($name);
 
             $this->persistToolSuccess($tool, $invocation, $conversationId, $name, $args, $result, $encoded, $startedAt, $overran);
 
@@ -427,7 +422,7 @@ final class StreamCoordinator
                 'content' => $encoded,
             ];
         } catch (\Throwable $e) {
-            $this->emit('tool_failed', ['name' => $name, 'phase' => 'failed']);
+            $this->emitter->toolFailed($name);
 
             $errorMsg = "[error: tool '{$name}' threw an exception: {$e->getMessage()}]";
             $this->persistInvocation($conversationId, $name, $args, $errorMsg, 'handler_error', $e->getMessage(), $startedAt);
@@ -439,17 +434,6 @@ final class StreamCoordinator
                 'content' => $errorMsg,
             ];
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function emit(string $event, array $data): void
-    {
-        echo "event: {$event}\n";
-        echo 'data: '.json_encode($data, JSON_THROW_ON_ERROR)."\n";
-        echo "\n";
-        flush();
     }
 
     private function incrementCounter(): void

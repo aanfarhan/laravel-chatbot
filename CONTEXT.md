@@ -37,10 +37,16 @@ A single execution of a [[tool]] handler triggered by the LLM. Carries the LLM-s
 The provider-driven cycle within a single user message: model emits `tool_calls` → server resolves each call against the [[tool-registry]] (gated by the [[tool-allowlist]]) → executes handlers → appends results as `role: tool` messages → re-invokes the provider. Repeats until the model produces final prose or a configured iteration cap is hit.
 
 ### Tool status event
-A structured SSE event emitted to the frontend during the [[tool-call-loop]] carrying only the tool `name` and lifecycle phase (`started`, `finished`, `failed`). Arguments and results are never sent to the client. The widget renders these as a transient status chip (themable via existing CSS-parts).
+A structured SSE event emitted to the frontend during the [[tool-call-loop]] carrying only the tool `name` and lifecycle phase (`started`, `finished`, `failed`). Arguments and results are never sent to the client. The widget renders these as a transient status chip (themable via existing CSS-parts). Written through the [[stream-emitter]], the same seam every other turn event uses.
+
+### Stream emitter
+The seam through which every server-sent event of a turn is written — assistant tokens, the context summary, the [[tool-status-event]], and the terminal `done`/`error`. A single instance is shared across the turn so events originating in the [[tool-call-loop]] and inside each [[tool-invocation]] interleave in wire order. The production adapter writes SSE frames and flushes; tests substitute a recording adapter, making the ordered event stream the assertion surface instead of a captured output buffer.
 
 ### Tool invocation record
-The persisted trace of a single [[tool-invocation]] — tool name, (optionally redacted) arguments, (optionally redacted) result, timestamp, whether it overran its [[advisory-tool-budget]], and the conversation message it belongs to. Stored in its own table (not inlined on `messages`) so tool usage can be queried independently for audit, debugging, and analytics.
+The persisted trace of a single [[tool-invocation]] — tool name, (optionally redacted) arguments, (optionally redacted) result, timestamp, whether it overran its [[advisory-tool-budget]], the terminal status (see [[tool-invocation-result]]), and the conversation message it belongs to. Stored in its own table (not inlined on `messages`) so tool usage can be queried independently for audit, debugging, and analytics. Every invocation leaves a record, including rejected ones (allowlist, unknown tool, schema, authorization) — there is no silent path.
+
+### Tool invocation result
+The transient, in-memory outcome of a single [[tool-invocation]]: the `role: tool` message fed back to the model, the handler's wall-clock duration (excluded from the [[stream-duration]] budget per ADR-0006), and a status drawn from a fixed set — `ok`, `rejected_allowlist`, `rejected_not_found`, `rejected_schema`, `rejected_unauthorized`, `handler_error`. Distinct from the [[tool-invocation-record]]: the result is what the [[tool-call-loop]] consumes in-memory and discards after the turn, while the record is its durable audit trace.
 
 ### Advisory tool budget
 The per-tool wall-clock duration a [[tool-invocation]] is measured against. **Advisory, not enforcing**: the package runs the tool's handler synchronously and cannot interrupt a blocking call, so it records the duration and an overrun flag on the [[tool-invocation-record]] but always lets a completed result through. Bounding a tool's actual runtime is the host's responsibility (HTTP-client timeouts, query limits, offloading long work to a queue). Global default, configurable. See ADR-0006.
@@ -50,6 +56,9 @@ The wall-clock budget for LLM token streaming within a single SSE response, meas
 
 ### Freshness window
 The maximum age of a stored [[tool-invocation-record]] for which its result is replayed into the LLM's history on subsequent user turns. Older records are kept for audit but omitted from replay, forcing the model to re-call the tool if it still needs that data. Default 5 minutes; configurable per channel.
+
+### Conversation replay
+The reconstructed prior history for a resolved [[conversation]], ready to slot between the system prompt and the current user message: prior user/assistant turns loaded from the store, interleaved in wire order with the tool call/result pairs still inside the [[freshness-window]]. Owns the two subtle rules of that reconstruction — (1) the **stale-call filter**: each stored [[tool-invocation-record]] is re-checked against today's rules (tool still registered, arguments still valid under its current schema) and only still-valid pairs replay, the rest dropped silently but left in the DB for audit; (2) the **interleave**: a stable chronological sort that keeps each call/result pair adjacent, breaks timestamp ties in load order, and drops content-free tool-only assistant turns (their pair carries them instead). A single deep module behind one `historyFor(conversation, freshnessWindow)` interface.
 
 ### Context envelope
 The signed, short-lived token minted at page render that carries the channel's context payload and metadata to the `/messages` endpoint. Will be extended to carry the tool allowlist.
