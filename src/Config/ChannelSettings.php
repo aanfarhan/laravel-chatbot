@@ -67,33 +67,26 @@ final class ChannelSettings
 
     public function extractorTimeoutMs(string $channel): ?int
     {
-        $key = "chatbot.channels.{$channel}.extractor_timeout_ms";
-
-        if (! $this->config->has($key)) {
-            return null;
-        }
-
-        $raw = $this->config->get($key);
-
-        if (! is_int($raw)) {
-            throw new \InvalidArgumentException("chatbot.channels.{$channel}.extractor_timeout_ms must be an integer");
-        }
-
-        return $raw;
+        return $this->resolveChannelInt($channel, 'extractor_timeout_ms');
     }
 
     public function extractorSizeCapBytes(string $channel): ?int
     {
-        $key = "chatbot.channels.{$channel}.extractor_size_cap_bytes";
+        return $this->resolveChannelInt($channel, 'extractor_size_cap_bytes');
+    }
 
-        if (! $this->config->has($key)) {
+    private function resolveChannelInt(string $channel, string $key): ?int
+    {
+        $path = "chatbot.channels.{$channel}.{$key}";
+
+        if (! $this->config->has($path)) {
             return null;
         }
 
-        $raw = $this->config->get($key);
+        $raw = $this->config->get($path);
 
         if (! is_int($raw)) {
-            throw new \InvalidArgumentException("chatbot.channels.{$channel}.extractor_size_cap_bytes must be an integer");
+            throw new \InvalidArgumentException("{$path} must be an integer");
         }
 
         return $raw;

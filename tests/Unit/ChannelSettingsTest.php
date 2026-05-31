@@ -125,7 +125,8 @@ it('returns null when extractor_timeout_ms absent', function (): void {
 
 it('throws when extractor_timeout_ms is wrong type', function (): void {
     $s = makeSettings(['channels' => ['web' => ['extractor_timeout_ms' => 'fast']]]);
-    expect(fn () => $s->extractorTimeoutMs('web'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $s->extractorTimeoutMs('web'))
+        ->toThrow(InvalidArgumentException::class, 'chatbot.channels.web.extractor_timeout_ms must be an integer');
 });
 
 // ─── extractorSizeCapBytes (per-channel only, null default) ──────────────────
@@ -138,6 +139,12 @@ it('returns per-channel extractor_size_cap_bytes', function (): void {
 it('returns null when extractor_size_cap_bytes absent', function (): void {
     $s = makeSettings([]);
     expect($s->extractorSizeCapBytes('web'))->toBeNull();
+});
+
+it('throws when extractor_size_cap_bytes is wrong type', function (): void {
+    $s = makeSettings(['channels' => ['web' => ['extractor_size_cap_bytes' => 'big']]]);
+    expect(fn () => $s->extractorSizeCapBytes('web'))
+        ->toThrow(InvalidArgumentException::class, 'chatbot.channels.web.extractor_size_cap_bytes must be an integer');
 });
 
 // ─── prompt (channel-only) ────────────────────────────────────────────────────
