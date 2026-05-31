@@ -49,7 +49,7 @@ final class TokenCounter
         $history = $rest; // alternating assistant/user pairs
 
         while ($history !== [] && $this->count([...$system, ...$history, $current]) > $cap) {
-            array_shift($history); // remove oldest turn
+            $this->shiftOldestBlock($history); // remove oldest turn (whole tool block if any)
         }
 
         $candidate = [...array_values($system), ...$history, $current];
@@ -61,5 +61,32 @@ final class TokenCounter
         }
 
         return $candidate;
+    }
+
+    /**
+     * Removes the oldest history block in place. A plain user/assistant turn is a
+     * single-message block. An assistant tool-call message forms one indivisible
+     * block with all of the `tool` result messages that immediately follow it, so
+     * trimming never orphans a tool result from its originating call.
+     *
+     * @param  list<array<string, mixed>>  $history
+     */
+    private function shiftOldestBlock(array &$history): void
+    {
+        $first = array_shift($history);
+
+        if ($first === null) {
+            return;
+        }
+
+        $isToolCall = ($first['role'] ?? null) === 'assistant' && isset($first['tool_calls']);
+
+        if (! $isToolCall) {
+            return;
+        }
+
+        while ($history !== [] && ($history[0]['role'] ?? null) === 'tool') {
+            array_shift($history);
+        }
     }
 }
