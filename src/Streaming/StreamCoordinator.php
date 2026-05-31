@@ -11,8 +11,6 @@ use Aanfarhan\Chatbot\Events\ChatbotMessageCompleted;
 use Aanfarhan\Chatbot\Events\ChatbotMessageFailed;
 use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
-use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
-use Aanfarhan\Chatbot\Responses\StreamChunk;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -26,8 +24,10 @@ final class StreamCoordinator
 {
     private const CACHE_COUNTER_KEY = 'chatbot.active_streams';
 
+    private readonly TurnStreamer $turnStreamer;
+
     public function __construct(
-        private readonly LLMClient $llm,
+        LLMClient $llm,
         private readonly ConversationStore $store,
         private readonly ConfigRepository $config,
         private readonly ?CacheRepository $cache = null,
@@ -36,7 +36,9 @@ final class StreamCoordinator
         private readonly ?Closure $clock = null,
         private readonly StreamEmitter $emitter = new SseStreamEmitter,
         private readonly ?ToolInvoker $toolInvoker = null,
-    ) {}
+    ) {
+        $this->turnStreamer = new TurnStreamer($llm, $emitter, $toolInvoker, $clock);
+    }
 
     /**
      * Monotonic wall-clock source in seconds. Injectable so timing-dependent
@@ -85,10 +87,6 @@ final class StreamCoordinator
         ): void {
             $this->incrementCounter();
             $startedAt = $this->now();
-            $assembled = '';
-            $usage = null;
-            $aborted = false;
-            $chatbotException = null;
 
             $resolvedModel = $model ?? $this->config->string('chatbot.model', '');
 
@@ -100,6 +98,7 @@ final class StreamCoordinator
                 ));
             }
 
+            $preflightFailure = null;
             try {
                 if ($preflight !== null) {
                     $preflight();
@@ -108,169 +107,131 @@ final class StreamCoordinator
                 if ($contextSummary !== null) {
                     $this->emitter->contextSummary($contextSummary);
                 }
-
-                $toolDefs = $this->resolveToolDefs($allowedTools);
-                $loopMessages = $messages;
-                $callsThisTurn = 0;
-                $maxCalls = $toolDefs !== [] ? $this->maxCallsPerTurn() : PHP_INT_MAX;
-
-                // Wall-clock spent blocked in synchronous tool handlers. Excluded from
-                // the stream budget, which measures LLM-streaming time only (ADR-0006).
-                $toolTimeSpent = 0.0;
-
-                while (true) {
-                    // Cut a runaway loop before opening a new LLM round-trip.
-                    if (($this->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
-                        throw new ChatbotTimeoutException('stream duration exceeded');
-                    }
-
-                    $iterToolCalls = [];
-                    $iterText = '';
-
-                    foreach ($this->llm->stream($loopMessages, tools: $toolDefs, model: $model) as $chunk) {
-                        if ($isAborted()) {
-                            $aborted = true;
-                            break 2;
-                        }
-
-                        // Cut a runaway model stream between chunks.
-                        if (($this->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
-                            throw new ChatbotTimeoutException('stream duration exceeded');
-                        }
-
-                        /** @var StreamChunk $chunk */
-                        if ($chunk->toolCalls !== []) {
-                            foreach ($chunk->toolCalls as $tc) {
-                                $iterToolCalls[] = $tc;
-                            }
-                        }
-
-                        if ($chunk->content !== '') {
-                            $iterText .= $chunk->content;
-                            $assembled .= $chunk->content;
-                            $this->emitter->token($chunk->content);
-                        }
-
-                        if ($chunk->usage !== null) {
-                            $usage = $chunk->usage;
-                        }
-                    }
-
-                    if ($iterToolCalls === []) {
-                        break;
-                    }
-
-                    // Build assistant message carrying the tool_calls
-                    $assistantMsg = ['role' => 'assistant', 'content' => $iterText !== '' ? $iterText : null];
-                    $assistantMsg['tool_calls'] = array_map(
-                        fn (array $tc): array => [
-                            'id' => $tc['id'],
-                            'type' => 'function',
-                            'function' => ['name' => $tc['name'], 'arguments' => $tc['arguments']],
-                        ],
-                        $iterToolCalls,
-                    );
-                    $loopMessages[] = $assistantMsg;
-
-                    foreach ($iterToolCalls as $tc) {
-                        if ($callsThisTurn >= $maxCalls) {
-                            $loopMessages[] = [
-                                'role' => 'tool',
-                                'tool_call_id' => $tc['id'],
-                                'name' => $tc['name'],
-                                'content' => '[budget exhausted — tool call limit reached for this turn]',
-                            ];
-
-                            continue;
-                        }
-
-                        if ($this->toolInvoker === null) {
-                            $loopMessages[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'name' => $tc['name'], 'content' => '[error: no tool handler configured]'];
-
-                            continue;
-                        }
-
-                        $invokeResult = $this->toolInvoker->invoke(
-                            name: $tc['name'],
-                            argumentsJson: $tc['arguments'],
-                            callId: $tc['id'],
-                            channel: $channel,
-                            conversationId: $conversationId,
-                            actor: $actor,
-                            allowedTools: $allowedTools,
-                        );
-                        $loopMessages[] = $invokeResult->message;
-                        $toolTimeSpent += $invokeResult->elapsedSeconds;
-                        $callsThisTurn++;
-                    }
-
-                    if ($callsThisTurn >= $maxCalls) {
-                        $toolDefs = [];
-                    }
-                }
             } catch (ChatbotException $e) {
-                $chatbotException = $e;
-                $this->emitter->error($e->code(), $e->getMessage(), $e->isRetryable());
+                // Preflight rejections (quota, auth) produce a Failed result before the LLM round starts.
+                $preflightFailure = $e;
+            }
 
-                if ($this->events !== null) {
-                    $this->events->dispatch(new ChatbotMessageFailed(
-                        conversationId: $conversationId,
+            try {
+                $toolDefs = $this->resolveToolDefs($allowedTools);
+
+                $result = $preflightFailure !== null
+                    ? new TurnResult('', null, TurnOutcome::Failed, $preflightFailure)
+                    : $this->turnStreamer->run(
+                        messages: $messages,
+                        toolDefs: $toolDefs,
+                        maxCalls: $this->maxCallsPerTurn(),
+                        streamDuration: $streamDuration,
+                        startedAt: $startedAt,
+                        isAborted: $isAborted,
+                        model: $model,
                         channel: $channel,
-                        exception: $e,
-                    ));
-                }
+                        conversationId: $conversationId,
+                        actor: $actor,
+                        allowedTools: $allowedTools,
+                    );
             } finally {
                 $this->decrementCounter();
             }
 
             $durationMs = (int) round(($this->now() - $startedAt) * 1000);
 
-            if (! $aborted) {
-                $this->store->append(
-                    conversationId: $conversationId,
-                    role: 'assistant',
-                    content: $assembled,
-                    routeName: $routeName,
-                    contextHash: $contextHash,
-                    inputTokens: $usage !== null ? $usage->inputTokens : 0,
-                    outputTokens: $usage !== null ? $usage->outputTokens : 0,
-                    error: $chatbotException !== null ? [
-                        'code' => $chatbotException->code(),
-                        'message' => $chatbotException->getMessage(),
-                    ] : null,
-                );
+            match ($result->outcome) {
+                TurnOutcome::Aborted => null,
 
-                $logContext = [
-                    'conversation_id' => $conversationId,
-                    'channel' => $channel,
-                    'model' => $resolvedModel,
-                    'duration_ms' => $durationMs,
-                    'input_tokens' => $usage !== null ? $usage->inputTokens : 0,
-                    'output_tokens' => $usage !== null ? $usage->outputTokens : 0,
-                ];
+                TurnOutcome::Failed => $this->handleFailed($result, $conversationId, $channel, $routeName, $contextHash, $resolvedModel, $durationMs),
 
-                if ($chatbotException !== null) {
-                    $logContext['error_code'] = $chatbotException->code();
-                    $this->logger?->info('[chatbot] turn failed', $logContext);
-                } else {
-                    $this->emitter->done(
-                        $conversationUuid,
-                        $usage !== null ? $usage->inputTokens : 0,
-                        $usage !== null ? $usage->outputTokens : 0,
-                    );
-
-                    if ($this->events !== null) {
-                        $this->events->dispatch(new ChatbotMessageCompleted(
-                            inputTokens: $usage !== null ? $usage->inputTokens : 0,
-                            outputTokens: $usage !== null ? $usage->outputTokens : 0,
-                            model: $resolvedModel,
-                        ));
-                    }
-
-                    $this->logger?->info('[chatbot] turn completed', $logContext);
-                }
-            }
+                TurnOutcome::Completed => $this->handleCompleted($result, $conversationId, $conversationUuid, $channel, $routeName, $contextHash, $resolvedModel, $durationMs),
+            };
         });
+    }
+
+    private function handleFailed(
+        TurnResult $result,
+        int $conversationId,
+        string $channel,
+        string $routeName,
+        string $contextHash,
+        string $resolvedModel,
+        int $durationMs,
+    ): void {
+        $e = $result->requireFailure();
+
+        $this->emitter->error($e->code(), $e->getMessage(), $e->isRetryable());
+
+        if ($this->events !== null) {
+            $this->events->dispatch(new ChatbotMessageFailed(
+                conversationId: $conversationId,
+                channel: $channel,
+                exception: $e,
+            ));
+        }
+
+        $this->store->append(
+            conversationId: $conversationId,
+            role: 'assistant',
+            content: $result->assembled,
+            routeName: $routeName,
+            contextHash: $contextHash,
+            inputTokens: $result->usage !== null ? $result->usage->inputTokens : 0,
+            outputTokens: $result->usage !== null ? $result->usage->outputTokens : 0,
+            error: ['code' => $e->code(), 'message' => $e->getMessage()],
+        );
+
+        $this->logger?->info('[chatbot] turn failed', [
+            'conversation_id' => $conversationId,
+            'channel' => $channel,
+            'model' => $resolvedModel,
+            'duration_ms' => $durationMs,
+            'input_tokens' => $result->usage !== null ? $result->usage->inputTokens : 0,
+            'output_tokens' => $result->usage !== null ? $result->usage->outputTokens : 0,
+            'error_code' => $e->code(),
+        ]);
+    }
+
+    private function handleCompleted(
+        TurnResult $result,
+        int $conversationId,
+        string $conversationUuid,
+        string $channel,
+        string $routeName,
+        string $contextHash,
+        string $resolvedModel,
+        int $durationMs,
+    ): void {
+        $this->store->append(
+            conversationId: $conversationId,
+            role: 'assistant',
+            content: $result->assembled,
+            routeName: $routeName,
+            contextHash: $contextHash,
+            inputTokens: $result->usage !== null ? $result->usage->inputTokens : 0,
+            outputTokens: $result->usage !== null ? $result->usage->outputTokens : 0,
+            error: null,
+        );
+
+        $this->emitter->done(
+            $conversationUuid,
+            $result->usage !== null ? $result->usage->inputTokens : 0,
+            $result->usage !== null ? $result->usage->outputTokens : 0,
+        );
+
+        if ($this->events !== null) {
+            $this->events->dispatch(new ChatbotMessageCompleted(
+                inputTokens: $result->usage !== null ? $result->usage->inputTokens : 0,
+                outputTokens: $result->usage !== null ? $result->usage->outputTokens : 0,
+                model: $resolvedModel,
+            ));
+        }
+
+        $this->logger?->info('[chatbot] turn completed', [
+            'conversation_id' => $conversationId,
+            'channel' => $channel,
+            'model' => $resolvedModel,
+            'duration_ms' => $durationMs,
+            'input_tokens' => $result->usage !== null ? $result->usage->inputTokens : 0,
+            'output_tokens' => $result->usage !== null ? $result->usage->outputTokens : 0,
+        ]);
     }
 
     /**
