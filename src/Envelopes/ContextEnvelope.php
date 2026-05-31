@@ -7,14 +7,11 @@ namespace Aanfarhan\Chatbot\Envelopes;
 use Aanfarhan\Chatbot\Exceptions\ExpiredEnvelopeException;
 use Aanfarhan\Chatbot\Exceptions\MismatchedEnvelopeException;
 use Aanfarhan\Chatbot\Exceptions\TamperedEnvelopeException;
-use DateTimeImmutable;
 use DateTimeInterface;
 use Illuminate\Contracts\Config\Repository;
 
 final class ContextEnvelope
 {
-    public const VERSION = 1;
-
     public function __construct(
         private readonly Repository $config,
     ) {}
@@ -38,39 +35,24 @@ final class ContextEnvelope
         ?int $extractorTimeoutMs = null,
         ?int $extractorSizeCapBytes = null,
     ): string {
-        $body = [
-            'v' => self::VERSION,
-            'u' => $userId,
-            'r' => $route,
-            'c' => $channel,
-            'e' => $expiresAt->getTimestamp(),
-            'p' => $payload,
-        ];
-
-        if ($greeting !== null) {
-            $body['g'] = $greeting;
-        }
-        if ($prompt !== null) {
-            $body['pr'] = $prompt;
-        }
-        if ($summary !== null) {
-            $body['s'] = $summary;
-        }
-        if ($allowedTools !== []) {
-            $body['t'] = $allowedTools;
-        }
-        if ($allowedExtractors !== []) {
-            $body['x'] = $allowedExtractors;
-        }
-        if ($extractorTimeoutMs !== null) {
-            $body['xt'] = $extractorTimeoutMs;
-        }
-        if ($extractorSizeCapBytes !== null) {
-            $body['xc'] = $extractorSizeCapBytes;
-        }
+        $envelope = new Envelope(
+            payload: $payload,
+            userId: $userId,
+            route: $route,
+            channel: $channel,
+            expiresAt: (new \DateTimeImmutable)->setTimestamp($expiresAt->getTimestamp()),
+            version: Envelope::VERSION,
+            greeting: $greeting,
+            prompt: $prompt,
+            summary: $summary,
+            allowedTools: $allowedTools,
+            allowedExtractors: $allowedExtractors,
+            extractorTimeoutMs: $extractorTimeoutMs,
+            extractorSizeCapBytes: $extractorSizeCapBytes,
+        );
 
         $encoded = $this->base64UrlEncode(
-            (string) json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+            (string) json_encode($envelope->toBody(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
         );
         $signature = $this->base64UrlEncode($this->sign($encoded));
 
@@ -99,70 +81,31 @@ final class ContextEnvelope
         $json = $this->base64UrlDecode($encoded);
         /** @var mixed $body */
         $body = json_decode($json, true);
-        if (! is_array($body)
-            || ! isset($body['v'], $body['r'], $body['c'], $body['e'], $body['p'])
-            || ! array_key_exists('u', $body)
-            || ! is_int($body['v'])
-            || ! is_string($body['r'])
-            || ! is_string($body['c'])
-            || ! is_int($body['e'])
-            || ! is_array($body['p'])
-            || ! (is_string($body['u']) || is_null($body['u']))
-        ) {
+        if (! is_array($body)) {
             throw new TamperedEnvelopeException('envelope payload malformed');
         }
 
-        if ($body['v'] !== self::VERSION) {
+        $envelope = Envelope::fromBody($body);
+
+        if ($envelope->version !== Envelope::VERSION) {
             throw new MismatchedEnvelopeException('envelope version mismatch');
         }
 
-        if ($body['e'] < time()) {
+        if ($envelope->expiresAt->getTimestamp() < time()) {
             throw new ExpiredEnvelopeException('envelope expired');
         }
 
-        if (array_key_exists('userId', $expected) && $expected['userId'] !== $body['u']) {
+        if (array_key_exists('userId', $expected) && $expected['userId'] !== $envelope->userId) {
             throw new MismatchedEnvelopeException('envelope user mismatch');
         }
-        if (array_key_exists('route', $expected) && $expected['route'] !== $body['r']) {
+        if (array_key_exists('route', $expected) && $expected['route'] !== $envelope->route) {
             throw new MismatchedEnvelopeException('envelope route mismatch');
         }
-        if (array_key_exists('channel', $expected) && $expected['channel'] !== $body['c']) {
+        if (array_key_exists('channel', $expected) && $expected['channel'] !== $envelope->channel) {
             throw new MismatchedEnvelopeException('envelope channel mismatch');
         }
 
-        /** @var array<string, mixed> $payload */
-        $payload = $body['p'];
-
-        $greeting = isset($body['g']) && is_string($body['g']) ? $body['g'] : null;
-        $prompt = isset($body['pr']) && is_string($body['pr']) ? $body['pr'] : null;
-        $summary = isset($body['s']) && is_string($body['s']) ? $body['s'] : null;
-
-        $rawTools = isset($body['t']) && is_array($body['t']) ? $body['t'] : [];
-        /** @var list<string> $allowedTools */
-        $allowedTools = array_values(array_filter($rawTools, 'is_string'));
-
-        $rawExtractors = isset($body['x']) && is_array($body['x']) ? $body['x'] : [];
-        /** @var list<string> $allowedExtractors */
-        $allowedExtractors = array_values(array_filter($rawExtractors, 'is_string'));
-
-        $extractorTimeoutMs = isset($body['xt']) && is_int($body['xt']) ? $body['xt'] : null;
-        $extractorSizeCapBytes = isset($body['xc']) && is_int($body['xc']) ? $body['xc'] : null;
-
-        return new Envelope(
-            payload: $payload,
-            userId: $body['u'],
-            route: $body['r'],
-            channel: $body['c'],
-            expiresAt: (new DateTimeImmutable)->setTimestamp($body['e']),
-            version: $body['v'],
-            greeting: $greeting,
-            prompt: $prompt,
-            summary: $summary,
-            allowedTools: $allowedTools,
-            allowedExtractors: $allowedExtractors,
-            extractorTimeoutMs: $extractorTimeoutMs,
-            extractorSizeCapBytes: $extractorSizeCapBytes,
-        );
+        return $envelope;
     }
 
     private function sign(string $encoded): string

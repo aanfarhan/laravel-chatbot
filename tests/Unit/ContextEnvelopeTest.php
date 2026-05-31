@@ -38,7 +38,7 @@ it('mint -> verify round-trips payload, user, route, channel, expiry', function 
         ->and($verified->route)->toBe('orders.show')
         ->and($verified->channel)->toBe('default')
         ->and($verified->expiresAt->getTimestamp())->toBe($expiresAt->getTimestamp())
-        ->and($verified->version)->toBe(ContextEnvelope::VERSION);
+        ->and($verified->version)->toBe(Envelope::VERSION);
 });
 
 it('rejects a token whose signature has been tampered with', function (): void {
@@ -70,7 +70,7 @@ it('rejects a token whose body has been swapped under the original signature', f
 
     [, $sig] = explode('.', $token);
     $forgedBody = rtrim(strtr(base64_encode((string) json_encode([
-        'v' => ContextEnvelope::VERSION,
+        'v' => Envelope::VERSION,
         'u' => '1',
         'r' => 'r',
         'c' => 'default',
@@ -207,7 +207,7 @@ it('rejects a token whose version does not match the current version', function 
 
     $key = base64_decode(substr((string) config('app.key'), 7), true);
     $body = (string) json_encode([
-        'v' => ContextEnvelope::VERSION + 1,
+        'v' => Envelope::VERSION + 1,
         'u' => '1',
         'r' => 'r',
         'c' => 'default',
