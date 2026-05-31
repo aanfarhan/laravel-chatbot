@@ -150,3 +150,62 @@ it('does not retry when 400 error body is not tools-related', function (): void 
 
     expect($history)->toHaveCount(1);
 });
+
+it('throws ChatbotProviderException with retryable=false on HTTP 500', function (): void {
+    $mock = new MockHandler([new Response(500, [], 'Internal Server Error')]);
+    $history = [];
+    $client = buildOpenAiClient($mock, $history);
+
+    try {
+        iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']]));
+        expect(false)->toBeTrue('expected exception not thrown');
+    } catch (ChatbotProviderException $e) {
+        expect($e->isRetryable())->toBeFalse();
+        expect($e->getMessage())->toContain('500');
+    }
+});
+
+it('assembles streamed tool_call deltas and yields them as a single chunk on finish_reason=tool_calls', function (): void {
+    $chunk1 = json_encode(['choices' => [['delta' => ['tool_calls' => [['index' => 0, 'id' => 'call_abc', 'function' => ['name' => 'get_weather', 'arguments' => '']]]], 'finish_reason' => null]]]);
+    $chunk2 = json_encode(['choices' => [['delta' => ['tool_calls' => [['index' => 0, 'function' => ['arguments' => '{"city":']]]], 'finish_reason' => null]]]);
+    $chunk3 = json_encode(['choices' => [['delta' => ['tool_calls' => [['index' => 0, 'function' => ['arguments' => '"NYC"}']]]], 'finish_reason' => 'tool_calls']]]);
+    $sse = "data: $chunk1\n\ndata: $chunk2\n\ndata: $chunk3\n\ndata: [DONE]\n\n";
+
+    $mock = new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], $sse)]);
+    $history = [];
+    $client = buildOpenAiClient($mock, $history);
+
+    $chunks = iterator_to_array($client->stream([['role' => 'user', 'content' => 'what is the weather?']]));
+
+    expect($chunks)->toHaveCount(1);
+    $chunk = $chunks[0];
+    expect($chunk->content)->toBe('');
+    expect($chunk->toolCalls)->toHaveCount(1);
+    expect($chunk->toolCalls[0]['id'])->toBe('call_abc');
+    expect($chunk->toolCalls[0]['name'])->toBe('get_weather');
+    expect($chunk->toolCalls[0]['arguments'])->toBe('{"city":"NYC"}');
+});
+
+it('accumulates multiple tool_call deltas across chunks by index', function (): void {
+    // Two parallel tool calls, each receiving their arguments in fragments
+    $c1 = json_encode(['choices' => [['delta' => ['tool_calls' => [
+        ['index' => 0, 'id' => 'call_1', 'function' => ['name' => 'tool_a', 'arguments' => '']],
+        ['index' => 1, 'id' => 'call_2', 'function' => ['name' => 'tool_b', 'arguments' => '']],
+    ]], 'finish_reason' => null]]]);
+    $c2 = json_encode(['choices' => [['delta' => ['tool_calls' => [
+        ['index' => 0, 'function' => ['arguments' => '{"x":1}']],
+        ['index' => 1, 'function' => ['arguments' => '{"y":2}']],
+    ]], 'finish_reason' => 'tool_calls']]]);
+    $sse = "data: $c1\n\ndata: $c2\n\ndata: [DONE]\n\n";
+
+    $mock = new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], $sse)]);
+    $history = [];
+    $client = buildOpenAiClient($mock, $history);
+
+    $chunks = iterator_to_array($client->stream([['role' => 'user', 'content' => 'go']]));
+
+    expect($chunks)->toHaveCount(1);
+    expect($chunks[0]->toolCalls)->toHaveCount(2);
+    expect($chunks[0]->toolCalls[0])->toMatchArray(['id' => 'call_1', 'name' => 'tool_a', 'arguments' => '{"x":1}']);
+    expect($chunks[0]->toolCalls[1])->toMatchArray(['id' => 'call_2', 'name' => 'tool_b', 'arguments' => '{"y":2}']);
+});
