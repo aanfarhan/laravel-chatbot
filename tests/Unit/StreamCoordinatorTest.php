@@ -11,9 +11,19 @@ use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tools\ToolInvocation;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
+use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
+
+function makeCoordinatorConfig(int $duration = 60, string $model = '', bool $supportsTools = true, int $maxCalls = 5): ConfigRepository
+{
+    return new ConfigRepository(['chatbot' => [
+        'stream_duration' => $duration,
+        'model' => $model,
+        'provider' => ['supports_tools' => $supportsTools],
+        'tools' => ['max_calls_per_turn' => $maxCalls],
+    ]]);
+}
 
 function parseSseEvents(string $raw): array
 {
@@ -64,12 +74,7 @@ it('emits error event and stops when stream-duration cap is exceeded', function 
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(0); // instant cap
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
-    $coordinator = new StreamCoordinator($client, $store, $config);
+    $coordinator = new StreamCoordinator($client, $store, makeCoordinatorConfig(duration: 0)); // instant cap
 
     ob_start();
     $coordinator->handle(
@@ -95,17 +100,12 @@ it('tears down the upstream stream and decrements counter on client abort', func
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->never();
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
     $cache = Mockery::mock(Repository::class);
     $cache->shouldReceive('increment')->once();
     $cache->shouldReceive('decrement')->once();
 
     $callCount = 0;
-    $coordinator = new StreamCoordinator($client, $store, $config, $cache);
+    $coordinator = new StreamCoordinator($client, $store, makeCoordinatorConfig(), $cache);
 
     ob_start();
     $coordinator->handle(
@@ -129,16 +129,11 @@ it('increments the active-stream counter on start and decrements on success', fu
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
     $cache = Mockery::mock(Repository::class);
     $cache->shouldReceive('increment')->with('chatbot.active_streams')->once();
     $cache->shouldReceive('decrement')->with('chatbot.active_streams')->once();
 
-    $coordinator = new StreamCoordinator($client, $store, $config, $cache);
+    $coordinator = new StreamCoordinator($client, $store, makeCoordinatorConfig(), $cache);
 
     ob_start();
     $coordinator->handle(
@@ -158,12 +153,7 @@ it('emits token events then done for a three-chunk stream', function (): void {
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
-    $coordinator = new StreamCoordinator($client, $store, $config);
+    $coordinator = new StreamCoordinator($client, $store, makeCoordinatorConfig());
 
     $response = $coordinator->handle(
         messages: [['role' => 'user', 'content' => 'hi']],
@@ -200,13 +190,8 @@ it('emits token and done via recording emitter without ob_start', function (): v
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
     $emitter = new RecordingStreamEmitter;
-    $coordinator = new StreamCoordinator($client, $store, $config, emitter: $emitter);
+    $coordinator = new StreamCoordinator($client, $store, makeCoordinatorConfig(), emitter: $emitter);
 
     $coordinator->handle(
         messages: [['role' => 'user', 'content' => 'hi']],
@@ -231,12 +216,7 @@ it('persists the assistant message but omits its id from the done event', functi
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->once()->andReturn(makeMessageRecord());
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
-    $coordinator = new StreamCoordinator($client, $store, $config);
+    $coordinator = new StreamCoordinator($client, $store, makeCoordinatorConfig());
 
     ob_start();
     $coordinator->handle(
@@ -318,16 +298,10 @@ it('uses the injected ToolInvoker emitter events when a tool call arrives', func
     $store = Mockery::mock(ConversationStore::class);
     $store->shouldReceive('append')->andReturn(makeMessageRecord());
 
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn(60);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-    $config->shouldReceive('get')->with('chatbot.tools.max_calls_per_turn', 5)->andReturn(5);
-
     $coordinator = new StreamCoordinator(
         llm: $client,
         store: $store,
-        config: $config,
+        config: makeCoordinatorConfig(),
         emitter: $emitter,
         toolInvoker: $invoker,
     );

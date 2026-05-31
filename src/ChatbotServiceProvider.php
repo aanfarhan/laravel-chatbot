@@ -7,6 +7,8 @@ namespace Aanfarhan\Chatbot;
 use Aanfarhan\Chatbot\Blade\BladeSnapshotCompiler;
 use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Clients\OpenAiCompatibleClient;
+use Aanfarhan\Chatbot\Config\ChannelSettings;
+use Aanfarhan\Chatbot\Config\Defaults;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
@@ -35,7 +37,12 @@ final class ChatbotServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/chatbot.php', 'chatbot');
 
-        $this->app->singleton(Chatbot::class, fn (Application $app): Chatbot => new Chatbot($app));
+        $this->app->singleton(Chatbot::class, fn (Application $app): Chatbot => new Chatbot($app, $app->make(ChannelSettings::class)));
+
+        $this->app->singleton(
+            ChannelSettings::class,
+            fn (Application $app): ChannelSettings => new ChannelSettings($app->make('config')),
+        );
 
         $this->app->singleton(ToolRegistry::class, fn (Application $app): ToolRegistry => new ToolRegistry($app));
 
@@ -54,9 +61,8 @@ final class ChatbotServiceProvider extends ServiceProvider
             function (Application $app): PromptAssembler {
                 /** @var Repository $config */
                 $config = $app->make('config');
-                $cap = $config->get('chatbot.context.section_size_cap', 4096);
 
-                return new PromptAssembler(sectionSizeCap: is_int($cap) ? $cap : 4096);
+                return new PromptAssembler(sectionSizeCap: $config->integer('chatbot.context.section_size_cap', Defaults::SECTION_SIZE_CAP));
             },
         );
 
@@ -81,13 +87,12 @@ final class ChatbotServiceProvider extends ServiceProvider
             function (Application $app): ConversationReplay {
                 /** @var Repository $config */
                 $config = $app->make('config');
-                $maxArgLength = $config->get('chatbot.tools.default_max_arg_length', 10240);
 
                 return new ConversationReplay(
                     conversations: $app->make(ConversationStore::class),
                     invocations: $app->make(ToolInvocationStore::class),
                     registry: $app->make(ToolRegistry::class),
-                    validator: new ToolArgumentValidator(is_int($maxArgLength) ? $maxArgLength : 10240),
+                    validator: new ToolArgumentValidator($config->integer('chatbot.tools.default_max_arg_length', Defaults::MAX_ARG_LENGTH)),
                 );
             },
         );
@@ -99,17 +104,14 @@ final class ChatbotServiceProvider extends ServiceProvider
         $this->app->singleton(ToolInvoker::class, function (Application $app): ToolInvoker {
             /** @var Repository $config */
             $config = $app->make('config');
-            $defaultTimeout = $config->get('chatbot.tools.default_timeout', 10);
-            $resultSizeCap = $config->get('chatbot.tools.result_size_cap', 4096);
-            $maxArgLength = $config->get('chatbot.tools.default_max_arg_length', 10240);
 
             return new ToolInvoker(
                 resolver: $app->make(ToolRegistry::class),
                 invocationStore: $app->make(ToolInvocationStore::class),
                 emitter: $app->make(StreamEmitter::class),
-                defaultTimeout: is_int($defaultTimeout) ? $defaultTimeout : 10,
-                resultSizeCap: is_int($resultSizeCap) ? $resultSizeCap : 4096,
-                maxArgLength: is_int($maxArgLength) ? $maxArgLength : 10240,
+                defaultTimeout: $config->integer('chatbot.tools.default_timeout', Defaults::DEFAULT_TIMEOUT),
+                resultSizeCap: $config->integer('chatbot.tools.result_size_cap', Defaults::RESULT_SIZE_CAP),
+                maxArgLength: $config->integer('chatbot.tools.default_max_arg_length', Defaults::MAX_ARG_LENGTH),
             );
         });
 

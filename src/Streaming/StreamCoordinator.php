@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Aanfarhan\Chatbot\Streaming;
 
+use Aanfarhan\Chatbot\Config\Defaults;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Events\ChatbotMessageCompleted;
@@ -65,8 +66,7 @@ final class StreamCoordinator
         string $conversationUuid = '',
     ): StreamedResponse {
         $isAborted ??= static fn (): bool => (bool) connection_aborted();
-        $rawDuration = $this->config->get('chatbot.stream_duration', 60);
-        $streamDuration = is_int($rawDuration) ? $rawDuration : 60;
+        $streamDuration = $this->config->integer('chatbot.stream_duration', Defaults::STREAM_DURATION);
 
         return new StreamedResponse(function () use (
             $messages,
@@ -90,8 +90,7 @@ final class StreamCoordinator
             $aborted = false;
             $chatbotException = null;
 
-            $rawModel = $this->config->get('chatbot.model', '');
-            $resolvedModel = $model ?? (is_string($rawModel) ? $rawModel : '');
+            $resolvedModel = $model ?? $this->config->string('chatbot.model', '');
 
             if ($this->events !== null) {
                 $this->events->dispatch(new ChatbotMessageStarted(
@@ -280,8 +279,7 @@ final class StreamCoordinator
      */
     private function resolveToolDefs(?array $allowedTools): array
     {
-        $supportsTools = $this->config->get('chatbot.provider.supports_tools', true);
-        if ($supportsTools === false || $this->toolInvoker === null) {
+        if ($this->config->boolean('chatbot.provider.supports_tools', true) === false || $this->toolInvoker === null) {
             return [];
         }
 
@@ -290,9 +288,7 @@ final class StreamCoordinator
 
     private function maxCallsPerTurn(): int
     {
-        $raw = $this->config->get('chatbot.tools.max_calls_per_turn', 5);
-
-        return is_int($raw) ? $raw : 5;
+        return $this->config->integer('chatbot.tools.max_calls_per_turn', Defaults::MAX_CALLS_PER_TURN);
     }
 
     private function incrementCounter(): void

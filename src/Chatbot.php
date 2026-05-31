@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot;
 
 use Aanfarhan\Chatbot\Clients\FakeClient;
+use Aanfarhan\Chatbot\Config\ChannelSettings;
 use Aanfarhan\Chatbot\Contracts\ChatbotTool;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
@@ -40,6 +41,7 @@ final class Chatbot
 
     public function __construct(
         private readonly Application $app,
+        private readonly ?ChannelSettings $channelSettings = null,
     ) {}
 
     /**
@@ -146,39 +148,17 @@ final class Chatbot
 
     public function resolveChannelPrompt(string $channel): ?string
     {
-        if (isset($this->channelPrompts[$channel])) {
-            return $this->channelPrompts[$channel];
-        }
-
-        /** @var Repository $config */
-        $config = $this->app->make('config');
-        $value = $config->get("chatbot.channels.{$channel}.prompt");
-
-        return is_string($value) && $value !== '' ? $value : null;
+        return $this->channelPrompts[$channel] ?? $this->channelSettings?->prompt($channel);
     }
 
     public function resolveChannelGreeting(string $channel): ?string
     {
-        if (isset($this->channelGreetings[$channel])) {
-            return $this->channelGreetings[$channel];
-        }
-
-        /** @var Repository $config */
-        $config = $this->app->make('config');
-        $value = $config->get("chatbot.channels.{$channel}.greeting");
-
-        return is_string($value) && $value !== '' ? $value : null;
+        return $this->channelGreetings[$channel] ?? $this->channelSettings?->greeting($channel);
     }
 
     public function resolveChannelSummary(string $channel): ?string
     {
-        $raw = $this->channelSummaries[$channel] ?? null;
-
-        if ($raw === null) {
-            /** @var Repository $config */
-            $config = $this->app->make('config');
-            $raw = $config->get("chatbot.channels.{$channel}.summary");
-        }
+        $raw = $this->channelSummaries[$channel] ?? $this->channelSettings?->summary($channel);
 
         if ($raw === null) {
             return null;
@@ -285,17 +265,9 @@ final class Chatbot
 
         $context = $this->channelContexts[$channel] ?? [];
 
-        $rawAllowed = $config->get("chatbot.channels.{$channel}.allowed_extractors", []);
-        /** @var list<string> $allowedExtractors */
-        $allowedExtractors = is_array($rawAllowed)
-            ? array_values(array_filter($rawAllowed, 'is_string'))
-            : [];
-
-        $rawTimeout = $config->get("chatbot.channels.{$channel}.extractor_timeout_ms");
-        $extractorTimeoutMs = is_int($rawTimeout) ? $rawTimeout : null;
-
-        $rawCap = $config->get("chatbot.channels.{$channel}.extractor_size_cap_bytes");
-        $extractorSizeCapBytes = is_int($rawCap) ? $rawCap : null;
+        $allowedExtractors = $this->channelSettings?->allowedExtractors($channel) ?? [];
+        $extractorTimeoutMs = $this->channelSettings?->extractorTimeoutMs($channel);
+        $extractorSizeCapBytes = $this->channelSettings?->extractorSizeCapBytes($channel);
 
         $token = $envelope->mint(
             payload: $context,

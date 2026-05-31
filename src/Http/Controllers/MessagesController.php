@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot\Http\Controllers;
 
 use Aanfarhan\Chatbot\Chatbot;
+use Aanfarhan\Chatbot\Config\ChannelSettings;
+use Aanfarhan\Chatbot\Config\Defaults;
 use Aanfarhan\Chatbot\ContextSanitizer;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\ConversationReplay;
@@ -40,6 +42,7 @@ final class MessagesController
         private readonly TokenCounter $tokenCounter,
         private readonly ThreadedActorResolver $actorResolver,
         private readonly StreamCoordinator $coordinator,
+        private readonly ChannelSettings $channelSettings,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -64,8 +67,7 @@ final class MessagesController
             return $throttleResponse;
         }
 
-        $rawTtl = $this->config->get('chatbot.conversation_ttl', 86400);
-        $ttl = is_int($rawTtl) ? $rawTtl : 86400;
+        $ttl = $this->config->integer('chatbot.conversation_ttl', Defaults::CONVERSATION_TTL);
 
         $guestToken = null;
         if ($verified->userId === null) {
@@ -97,17 +99,14 @@ final class MessagesController
         /** @var array<string, mixed> $channelConfig */
         $channelConfig = (array) $this->config->get('chatbot.channels.'.$verified->channel, []);
 
-        $model = isset($channelConfig['model']) && is_string($channelConfig['model'])
-            ? $channelConfig['model']
-            : null;
+        $model = $this->channelSettings->model($verified->channel);
 
         $sanitizedPayload = $this->sanitizer->sanitize($verified->payload);
         $contextHash = hash('sha256', (string) json_encode($sanitizedPayload));
 
         $routeOverrides = $verified->prompt !== null ? ['prompt' => $verified->prompt] : [];
 
-        $rawFreshness = $this->config->get('chatbot.tools.replay_freshness', 300);
-        $freshness = is_int($rawFreshness) ? $rawFreshness : 300;
+        $freshness = $this->channelSettings->freshnessWindow($verified->channel);
 
         $history = $this->replay->historyFor($conversation, $freshness);
 
@@ -121,9 +120,7 @@ final class MessagesController
             extractorResults: $extractorResults,
         );
 
-        $rawTokenCap = $this->config->get('chatbot.token_cap', 32768);
-        $tokenCap = is_int($rawTokenCap) ? $rawTokenCap : 32768;
-        $messages = $this->tokenCounter->prune($messages, $tokenCap);
+        $messages = $this->tokenCounter->prune($messages, $this->config->integer('chatbot.token_cap', Defaults::TOKEN_CAP));
 
         $this->store->append(
             conversationId: $conversation->id,
@@ -175,14 +172,8 @@ final class MessagesController
 
     private function checkThrottle(Request $request, string $channel): ?JsonResponse
     {
-        /** @var array<string, mixed> $channelThrottle */
-        $channelThrottle = (array) $this->config->get("chatbot.channels.{$channel}.throttle", []);
-
-        $rawPerMinute = $channelThrottle['per_minute'] ?? $this->config->get('chatbot.throttle.per_minute', 20);
-        $perMinute = is_int($rawPerMinute) ? $rawPerMinute : 20;
-
-        $rawPerDay = $channelThrottle['per_day'] ?? $this->config->get('chatbot.throttle.per_day', 200);
-        $perDay = is_int($rawPerDay) ? $rawPerDay : 200;
+        $perMinute = $this->channelSettings->throttlePerMinute($channel);
+        $perDay = $this->channelSettings->throttlePerDay($channel);
 
         $ip = $request->ip() ?? 'unknown';
         $base = "chatbot:{$channel}:{$ip}";

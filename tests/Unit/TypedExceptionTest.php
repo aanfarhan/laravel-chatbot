@@ -10,16 +10,15 @@ use Aanfarhan\Chatbot\Exceptions\ChatbotProviderException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Illuminate\Config\Repository as ConfigRepository;
 
 function makeConfig(int $duration = 60): ConfigRepository
 {
-    $config = Mockery::mock(ConfigRepository::class);
-    $config->shouldReceive('get')->with('chatbot.stream_duration', 60)->andReturn($duration);
-    $config->shouldReceive('get')->with('chatbot.model', '')->andReturn('gpt-4o-mini');
-    $config->shouldReceive('get')->with('chatbot.provider.supports_tools', true)->andReturn(true);
-
-    return $config;
+    return new ConfigRepository(['chatbot' => [
+        'stream_duration' => $duration,
+        'model' => 'gpt-4o-mini',
+        'provider' => ['supports_tools' => true],
+    ]]);
 }
 
 function makeStore(?callable $appendCallback = null): ConversationStore

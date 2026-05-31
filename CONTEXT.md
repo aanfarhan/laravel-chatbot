@@ -30,6 +30,9 @@ The rule that binds a [[conversation]] to the party allowed to read or append to
 ### Channel
 A named widget mount point (e.g. `default`, `admin`). Carries its own prompt, context, and — under this feature — tool allowlist.
 
+### Channel settings
+The resolved configuration for a [[channel]], read through one module that owns a single resolution rule: **per-channel value → global value → default**, applied uniformly to every setting (model, throttle limits, [[freshness-window]], prompt, greeting, summary, extractor allowlist and limits). The rule is strict on type — a config value of the wrong type fails loud (the framework's typed getters throw) rather than silently degrading to the default; only a *missing* key falls through to the next level. Defaults live once in a flat constants holder, referenced by both the published config file and the resolver. The module hides only the merge rule — pure global scalars with no per-channel dimension (e.g. token cap, stream duration, tool caps) are read directly through the framework's typed config getters, not fronted here, to avoid a shallow pass-through interface. Distinct from the in-memory overrides set by the fluent builder on the `Chatbot` facade, which take precedence over this resolver but are not owned by it.
+
 ### Tool invocation
 A single execution of a [[tool]] handler triggered by the LLM. Carries the LLM-supplied arguments, the channel, and the verified static context from the envelope. The [[threaded-actor]] is NOT on the invocation; it is passed as a separate typed first parameter to `authorize()` and `handle()` (see ADR-0003). The package calls the tool's `authorize()` before `handle()`; both methods are required on the contract so authorization is never an accidental omission.
 

@@ -376,3 +376,51 @@ it('assembles a brand-new conversation with empty history (system + current user
             && str_starts_with((string) ($messages[1]['content'] ?? ''), 'first ever message');
     });
 });
+
+it('per-channel replay_freshness overrides the global freshness window', function (): void {
+    // Global window is large (10 min); channel window is short (1 min).
+    config()->set('chatbot.tools.replay_freshness', 600);
+    config()->set('chatbot.channels.default.replay_freshness', 60);
+
+    Chatbot::clearTools();
+    Chatbot::registerTool(LookupOrderTool::class);
+
+    $store = app(ConversationStore::class);
+    $invocations = app(ToolInvocationStore::class);
+    $owned = $store->start('default', userId: null, guestToken: 'guest-per-channel');
+
+    // Recorded 120s ago — inside the global 600s window, outside the channel 60s window.
+    $invocations->record(
+        conversationId: $owned->id,
+        messageId: null,
+        toolName: 'lookup_order',
+        arguments: ['order_id' => 99],
+        result: '{"channel_freshness":"should_be_excluded"}',
+        status: 'ok',
+        error: null,
+        startedAt: now()->subSeconds(120),
+        finishedAt: now()->subSeconds(120),
+    );
+
+    $fake = Chatbot::fake()->respondWithStream(['ok']);
+    $envelope = $this->extractSignedContext($this->get('/orders/1'));
+
+    $response = $this->withCredentials()
+        ->withCookie('chatbot_conversation_default', $owned->uuid)
+        ->withCookie('chatbot_guest_id', 'guest-per-channel')
+        ->postJson('/chatbot/messages', [
+            'signed_context' => $envelope,
+            'message' => 'continue',
+        ])->assertOk();
+    drainReplay($response);
+
+    $fake->assertSentPrompt(function (array $messages): bool {
+        foreach ($messages as $m) {
+            if (($m['role'] ?? null) === 'tool' && str_contains((string) ($m['content'] ?? ''), 'should_be_excluded')) {
+                return false; // stale by channel window — must not appear
+            }
+        }
+
+        return true;
+    });
+});
