@@ -21,7 +21,6 @@ use Aanfarhan\Chatbot\Testing\Fixtures\FailingTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
-use Aanfarhan\Chatbot\Tools\ToolInvocationReplay;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use GuzzleHttp\Client as GuzzleClient;
@@ -78,14 +77,15 @@ final class ChatbotServiceProvider extends ServiceProvider
         $this->app->singleton(ToolInvocationStore::class, fn (): EloquentToolInvocationStore => new EloquentToolInvocationStore);
 
         $this->app->singleton(
-            ToolInvocationReplay::class,
-            function (Application $app): ToolInvocationReplay {
+            ConversationReplay::class,
+            function (Application $app): ConversationReplay {
                 /** @var Repository $config */
                 $config = $app->make('config');
                 $maxArgLength = $config->get('chatbot.tools.default_max_arg_length', 10240);
 
-                return new ToolInvocationReplay(
-                    store: $app->make(ToolInvocationStore::class),
+                return new ConversationReplay(
+                    conversations: $app->make(ConversationStore::class),
+                    invocations: $app->make(ToolInvocationStore::class),
                     registry: $app->make(ToolRegistry::class),
                     validator: new ToolArgumentValidator(is_int($maxArgLength) ? $maxArgLength : 10240),
                 );

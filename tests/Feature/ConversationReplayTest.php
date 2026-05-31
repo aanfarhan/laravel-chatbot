@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
+use Aanfarhan\Chatbot\ConversationReplay;
 use Aanfarhan\Chatbot\Facades\Chatbot;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
 use Aanfarhan\Chatbot\Tests\Stubs\LookupOrderTool;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
-use Aanfarhan\Chatbot\Tools\ToolInvocationReplay;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -22,10 +22,11 @@ beforeEach(function (): void {
     Chatbot::clearTools();
 });
 
-function makeReplay(): ToolInvocationReplay
+function makeReplay(): ConversationReplay
 {
-    return new ToolInvocationReplay(
-        store: app(ToolInvocationStore::class),
+    return new ConversationReplay(
+        conversations: app(ConversationStore::class),
+        invocations: app(ToolInvocationStore::class),
         registry: app(ToolRegistry::class),
         validator: new ToolArgumentValidator(10240),
     );
@@ -52,7 +53,7 @@ it('replays a valid stored invocation as an assistant tool_call plus matching to
         finishedAt: now()->subSeconds(60),
     );
 
-    $messages = makeReplay()->buildHistory($conversation->id, 300);
+    $messages = makeReplay()->historyFor($conversation, 300);
 
     expect($messages)->toHaveCount(2);
     expect($messages[0]['role'])->toBe('assistant');
@@ -86,7 +87,7 @@ it('drops a stored invocation whose args no longer validate against the current 
         finishedAt: now()->subSeconds(60),
     );
 
-    $messages = makeReplay()->buildHistory($conversation->id, 300);
+    $messages = makeReplay()->historyFor($conversation, 300);
 
     expect($messages)->toBe([]);
 });
@@ -112,7 +113,7 @@ it('retains the dropped invocation in the database (audit trail)', function (): 
         finishedAt: now()->subSeconds(60),
     );
 
-    makeReplay()->buildHistory($conversation->id, 300);
+    makeReplay()->historyFor($conversation, 300);
 
     $count = DB::table('chatbot_tool_invocations')->where('conversation_id', $conversation->id)->count();
     expect($count)->toBe(1);
@@ -151,7 +152,7 @@ it('replays only the records whose args validate, dropping the rest', function (
         finishedAt: now()->subSeconds(60),
     );
 
-    $messages = makeReplay()->buildHistory($conversation->id, 300);
+    $messages = makeReplay()->historyFor($conversation, 300);
 
     expect($messages)->toHaveCount(2);
     expect($messages[0]['tool_calls'][0]['function']['arguments'])->toBe(json_encode(['order_id' => 2]));
@@ -177,7 +178,7 @@ it('drops a stored invocation whose tool is no longer registered', function (): 
         finishedAt: now()->subSeconds(60),
     );
 
-    $messages = makeReplay()->buildHistory($conversation->id, 300);
+    $messages = makeReplay()->historyFor($conversation, 300);
 
     expect($messages)->toBe([]);
 });
@@ -204,7 +205,7 @@ it('produces only a messages array (no SSE, no budget side-effects)', function (
     );
 
     ob_start();
-    $messages = makeReplay()->buildHistory($conversation->id, 300);
+    $messages = makeReplay()->historyFor($conversation, 300);
     $sideEffects = ob_get_clean();
 
     expect($sideEffects)->toBe(''); // no SSE/output
@@ -242,7 +243,7 @@ it('after a schema change, replay drops stale records and the model re-calls the
         );
     }
 
-    $replayMessages = makeReplay()->buildHistory($conversation->id, 300);
+    $replayMessages = makeReplay()->historyFor($conversation, 300);
     expect($replayMessages)->toBe([]); // all stale records were silently dropped
 
     // Turn 2: model calls lookup_order under the new schema, then responds.

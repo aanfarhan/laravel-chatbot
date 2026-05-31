@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot;
 
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
+use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
-use Aanfarhan\Chatbot\Tools\ToolInvocationReplay;
+use Aanfarhan\Chatbot\Persistence\ToolInvocationRecord;
+use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
+use Aanfarhan\Chatbot\Tools\ToolRegistry;
 
 /**
  * Reconstructs the prompt history for a resolved conversation: prior
@@ -18,7 +21,9 @@ final class ConversationReplay
 {
     public function __construct(
         private readonly ConversationStore $conversations,
-        private readonly ToolInvocationReplay $toolReplay,
+        private readonly ToolInvocationStore $invocations,
+        private readonly ToolRegistry $registry,
+        private readonly ToolArgumentValidator $validator,
     ) {}
 
     /**
@@ -49,11 +54,13 @@ final class ConversationReplay
             ];
         }
 
-        foreach ($this->toolReplay->buildTimedHistory($conversation->id, $freshnessWindow) as $pair) {
-            $entries[] = [
-                'at' => $pair['at'],
-                'messages' => [$pair['messages'][0], $pair['messages'][1]],
-            ];
+        foreach ($this->invocations->freshFor($conversation->id, $freshnessWindow) as $record) {
+            $pair = $this->toMessagePair($record);
+            if ($pair === null) {
+                continue;
+            }
+
+            $entries[] = ['at' => $record->finishedAt, 'messages' => $pair];
         }
 
         // Stable sort keeps the call/result pair adjacent and, on a timestamp
@@ -68,5 +75,46 @@ final class ConversationReplay
         }
 
         return $history;
+    }
+
+    /**
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>}|null
+     */
+    private function toMessagePair(ToolInvocationRecord $record): ?array
+    {
+        $tool = $this->registry->resolve($record->toolName);
+        if ($tool === null) {
+            return null;
+        }
+
+        if (! $this->validator->validate($tool->parameters(), $record->arguments)) {
+            return null;
+        }
+
+        $callId = "replay_{$record->id}";
+
+        $assistant = [
+            'role' => 'assistant',
+            'content' => null,
+            'tool_calls' => [
+                [
+                    'id' => $callId,
+                    'type' => 'function',
+                    'function' => [
+                        'name' => $record->toolName,
+                        'arguments' => json_encode($record->arguments, JSON_THROW_ON_ERROR),
+                    ],
+                ],
+            ],
+        ];
+
+        $toolResult = [
+            'role' => 'tool',
+            'tool_call_id' => $callId,
+            'name' => $record->toolName,
+            'content' => $record->result,
+        ];
+
+        return [$assistant, $toolResult];
     }
 }
