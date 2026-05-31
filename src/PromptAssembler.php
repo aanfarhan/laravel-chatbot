@@ -24,10 +24,10 @@ final class PromptAssembler
      * @param  array<string, mixed>  $channelConfig
      * @param  array<string, mixed>  $routeOverrides
      * @param  array<string, mixed>  $contextPayload
-     * @param  list<array{role: string, content: string}>  $history
+     * @param  list<array<string, mixed>>  $history
      * @param  list<string>  $allowedExtractors
      * @param  array<string, string>  $extractorResults
-     * @return list<array{role: string, content: string}>
+     * @return list<array<string, mixed>>
      */
     public function assemble(
         array $channelConfig,
@@ -60,7 +60,7 @@ final class PromptAssembler
         ];
 
         foreach ($history as $turn) {
-            if ($turn['role'] === 'user' && str_contains($turn['content'], '<client-extractor')) {
+            if (($turn['role'] ?? null) === 'user' && is_string($turn['content'] ?? null) && str_contains($turn['content'], '<client-extractor')) {
                 $turn['content'] = trim((string) preg_replace(
                     '|\n\n<client-extractor[^>]*>.*?</client-extractor>|s',
                     '',

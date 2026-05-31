@@ -9,6 +9,7 @@ use Aanfarhan\Chatbot\ContextSanitizer;
 use Aanfarhan\Chatbot\Contracts\ConversationStore;
 use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
+use Aanfarhan\Chatbot\ConversationReplay;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Exceptions\ChatbotQuotaExceededException;
 use Aanfarhan\Chatbot\Exceptions\InvalidEnvelopeException;
@@ -17,6 +18,7 @@ use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Persistence\ConversationRecord;
 use Aanfarhan\Chatbot\PromptAssembler;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
+use Aanfarhan\Chatbot\TokenCounter;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
@@ -42,6 +44,8 @@ final class MessagesController
         private readonly Chatbot $chatbot,
         private readonly RateLimiter $rateLimiter,
         private readonly ToolInvocationStore $toolInvocationStore,
+        private readonly ConversationReplay $replay,
+        private readonly TokenCounter $tokenCounter,
         private readonly AuthFactory $auth,
         private readonly ?LoggerInterface $logger = null,
     ) {}
@@ -110,15 +114,24 @@ final class MessagesController
 
         $routeOverrides = $verified->prompt !== null ? ['prompt' => $verified->prompt] : [];
 
+        $rawFreshness = $this->config->get('chatbot.tools.replay_freshness', 300);
+        $freshness = is_int($rawFreshness) ? $rawFreshness : 300;
+
+        $history = $this->replay->historyFor($conversation, $freshness);
+
         $messages = $this->assembler->assemble(
             channelConfig: $channelConfig,
             routeOverrides: $routeOverrides,
             contextPayload: $sanitizedPayload,
-            history: [],
+            history: $history,
             userMessage: $message,
             allowedExtractors: $verified->allowedExtractors,
             extractorResults: $extractorResults,
         );
+
+        $rawTokenCap = $this->config->get('chatbot.token_cap', 32768);
+        $tokenCap = is_int($rawTokenCap) ? $rawTokenCap : 32768;
+        $messages = $this->tokenCounter->prune($messages, $tokenCap);
 
         $this->store->append(
             conversationId: $conversation->id,

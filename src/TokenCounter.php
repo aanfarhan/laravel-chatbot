@@ -9,12 +9,14 @@ use Aanfarhan\Chatbot\Exceptions\ChatbotTokenCapExceededException;
 final class TokenCounter
 {
     /**
-     * @param  list<array{role: string, content: string}>  $messages
+     * @param  list<array<string, mixed>>  $messages
      */
     public function count(array $messages): int
     {
         return array_sum(array_map(
-            fn (array $m): int => (int) ceil(mb_strlen($m['content']) / 4),
+            // A tool-call assistant turn carries null content (the call rides in
+            // tool_calls); treat any non-string content as contributing nothing.
+            fn (array $m): int => (int) ceil(mb_strlen(is_string($m['content'] ?? null) ? $m['content'] : '') / 4),
             $messages,
         ));
     }
@@ -24,8 +26,8 @@ final class TokenCounter
      * within $cap tokens. Raises ChatbotTokenCapExceededException if even a
      * single user+assistant turn pair alone exceeds the cap.
      *
-     * @param  list<array{role: string, content: string}>  $messages
-     * @return list<array{role: string, content: string}>
+     * @param  list<array<string, mixed>>  $messages
+     * @return list<array<string, mixed>>
      */
     public function prune(array $messages, int $cap): array
     {

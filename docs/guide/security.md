@@ -41,7 +41,7 @@ The package mediates between a host Laravel app and a third-party LLM. The attac
 | Base64 / obfuscated payloads | The sanitizer operates on plaintext. It does not decode or classify encoded content. |
 | Two-pass content classification | No secondary classifier runs on LLM output before display. |
 | Automatic retry / model fallback | The package surfaces provider errors; it does not retry or switch models. (`OpenAiCompatibleClient` does retry once without `tools` on a 400 tools-rejection — a compatibility fallback, not a general policy.) |
-| Tool result replay / dedup | `ToolInvocationReplay` and `chatbot.tools.replay_freshness` (default 300 s) are implemented but not yet wired into the request cycle. Re-invoking the same tool within a turn is not deduplicated. |
+| Tool result replay / dedup | Cross-turn replay is wired in: invocations within `chatbot.tools.replay_freshness` (default 300 s) are replayed into the prompt on later turns. Within a *single* turn, re-invoking the same tool is not deduplicated. |
 | Outbound tool side effects | Argument-level sandboxing is in scope. Network egress, filesystem isolation, capability boxing remain host/infrastructure concerns. |
 | Demo-mode exposure in production | If `chatbot.demo.enabled=true` is left on in production, `/chatbot/demo` is reachable and `LLMClient` is bound to `FakeClient`. **Never enable in production.** |
 

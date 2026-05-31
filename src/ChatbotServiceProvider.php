@@ -18,6 +18,8 @@ use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
 use Aanfarhan\Chatbot\Testing\Fixtures\FailingTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
+use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
+use Aanfarhan\Chatbot\Tools\ToolInvocationReplay;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Contracts\Config\Repository;
@@ -71,6 +73,21 @@ final class ChatbotServiceProvider extends ServiceProvider
         $this->app->singleton(ConversationStore::class, fn (): EloquentConversationStore => new EloquentConversationStore);
 
         $this->app->singleton(ToolInvocationStore::class, fn (): EloquentToolInvocationStore => new EloquentToolInvocationStore);
+
+        $this->app->singleton(
+            ToolInvocationReplay::class,
+            function (Application $app): ToolInvocationReplay {
+                /** @var Repository $config */
+                $config = $app->make('config');
+                $maxArgLength = $config->get('chatbot.tools.default_max_arg_length', 10240);
+
+                return new ToolInvocationReplay(
+                    store: $app->make(ToolInvocationStore::class),
+                    registry: $app->make(ToolRegistry::class),
+                    validator: new ToolArgumentValidator(is_int($maxArgLength) ? $maxArgLength : 10240),
+                );
+            },
+        );
 
         $this->app->singleton(LLMClient::class, function (Application $app): LLMClient {
             /** @var Repository $config */

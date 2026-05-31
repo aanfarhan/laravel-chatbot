@@ -22,17 +22,35 @@ final class ToolInvocationReplay
     {
         $messages = [];
 
+        foreach ($this->buildTimedHistory($conversationId, $windowSeconds) as $entry) {
+            $messages[] = $entry['messages'][0];
+            $messages[] = $entry['messages'][1];
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Same filtering as buildHistory(), but each surviving pair is tagged with
+     * the invocation's finished_at so callers can interleave tool replay with
+     * plain conversational turns in chronological order.
+     *
+     * @return list<array{at: \DateTimeInterface, messages: array{0: array<string, mixed>, 1: array<string, mixed>}}>
+     */
+    public function buildTimedHistory(int $conversationId, int $windowSeconds): array
+    {
+        $entries = [];
+
         foreach ($this->store->freshFor($conversationId, $windowSeconds) as $record) {
             $pair = $this->toMessagePair($record);
             if ($pair === null) {
                 continue;
             }
 
-            $messages[] = $pair[0];
-            $messages[] = $pair[1];
+            $entries[] = ['at' => $record->finishedAt, 'messages' => $pair];
         }
 
-        return $messages;
+        return $entries;
     }
 
     /**

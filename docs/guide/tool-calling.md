@@ -129,7 +129,7 @@ Knobs (`chatbot.tools.*`):
 | `max_calls_per_turn` | `5` | Total invocations across the loop. Hitting the cap injects a synthetic budget-exhausted result so the model still produces prose. |
 | `default_timeout` | `10` | **Advisory** per-tool budget in seconds — measured and recorded, not enforced. See [Tool execution & timeouts](#tool-execution-timeouts) below. |
 | `default_max_arg_length` | `10240` | Max byte length for any single string argument value. |
-| `replay_freshness` | `300` | How long a stored invocation remains valid for replay into history (currently not wired in — see [Security](./security)). |
+| `replay_freshness` | `300` | How long (seconds) a stored invocation stays eligible to replay into history. On each user turn, invocations finished within this window are replayed as assistant tool-call / tool-result pairs; older ones stay persisted for audit but are omitted from the prompt, forcing a re-call. |
 
 ## Tool execution & timeouts
 
