@@ -13,6 +13,7 @@ use Aanfarhan\Chatbot\Responses\Usage;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Psr7\Request;
+use Psr\Http\Message\StreamInterface;
 use Psr\Log\LoggerInterface;
 
 final class OpenAiCompatibleClient implements LLMClient
@@ -137,17 +138,10 @@ final class OpenAiCompatibleClient implements LLMClient
         $toolCallAccumulators = [];
 
         while (true) {
-            $char = $body->read(1);
-            if ($char === '') {
+            $line = $this->readSseLine($body);
+            if ($line === null) {
                 break;
             }
-            $line = '';
-            while ($char !== "\n" && $char !== '') {
-                $line .= $char;
-                $char = $body->read(1);
-            }
-
-            $line = trim($line);
 
             if (! str_starts_with($line, 'data:')) {
                 continue;
@@ -178,23 +172,7 @@ final class OpenAiCompatibleClient implements LLMClient
                     continue;
                 }
 
-                $idx = is_int($tcDelta['index'] ?? null) ? $tcDelta['index'] : 0;
-                if (! isset($toolCallAccumulators[$idx])) {
-                    $toolCallAccumulators[$idx] = ['id' => '', 'name' => '', 'arguments' => ''];
-                }
-
-                if (is_string($tcDelta['id'] ?? null)) {
-                    $toolCallAccumulators[$idx]['id'] .= $tcDelta['id'];
-                }
-
-                $fn = is_array($tcDelta['function'] ?? null) ? $tcDelta['function'] : [];
-                if (is_string($fn['name'] ?? null)) {
-                    $toolCallAccumulators[$idx]['name'] .= $fn['name'];
-                }
-
-                if (is_string($fn['arguments'] ?? null)) {
-                    $toolCallAccumulators[$idx]['arguments'] .= $fn['arguments'];
-                }
+                $this->accumulateToolCallDelta($toolCallAccumulators, $tcDelta);
             }
 
             $usage = null;
@@ -222,6 +200,44 @@ final class OpenAiCompatibleClient implements LLMClient
                 yield new StreamChunk($content, $usage);
             }
         }
+    }
+
+    /** @param array<int, array{id: string, name: string, arguments: string}> $accumulator */
+    private function accumulateToolCallDelta(array &$accumulator, array $tcDelta): void
+    {
+        $idx = is_int($tcDelta['index'] ?? null) ? $tcDelta['index'] : 0;
+        if (! isset($accumulator[$idx])) {
+            $accumulator[$idx] = ['id' => '', 'name' => '', 'arguments' => ''];
+        }
+
+        if (is_string($tcDelta['id'] ?? null)) {
+            $accumulator[$idx]['id'] .= $tcDelta['id'];
+        }
+
+        $fn = is_array($tcDelta['function'] ?? null) ? $tcDelta['function'] : [];
+        if (is_string($fn['name'] ?? null)) {
+            $accumulator[$idx]['name'] .= $fn['name'];
+        }
+
+        if (is_string($fn['arguments'] ?? null)) {
+            $accumulator[$idx]['arguments'] .= $fn['arguments'];
+        }
+    }
+
+    private function readSseLine(StreamInterface $body): ?string
+    {
+        $char = $body->read(1);
+        if ($char === '') {
+            return null;
+        }
+
+        $line = '';
+        while ($char !== "\n" && $char !== '') {
+            $line .= $char;
+            $char = $body->read(1);
+        }
+
+        return trim($line);
     }
 
     private function isToolsUnsupportedError(string $body): bool
