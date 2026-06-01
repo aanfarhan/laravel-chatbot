@@ -8,10 +8,9 @@ All routes are registered under `routes/chatbot*.php` and prefixed with `/chatbo
 | `GET` | `/chatbot/conversations/{id}/messages` | `chatbot.conversations.messages` | `HistoryController` | public contract; under `route_middleware` |
 | `GET` | `/chatbot/health` | `chatbot.health` | `HealthController` | public contract; no middleware |
 | `GET` | `/chatbot/widget.js` | `chatbot.widget-js` | _(inline closure)_ | public contract; no middleware |
-| `GET` | `/chatbot/demo` | `chatbot.demo` | `DemoController` | active only when `demo.enabled = true`; under `route_middleware` |
 | `GET` | `/chatbot/test-fixture` | `chatbot.playwright-fixture` | `PlaywrightFixtureController` | **internal** — active only when `playwright_fixture.enabled = true`; for the package's own e2e suite |
 
-The `POST /chatbot/messages` and `GET /chatbot/conversations/{id}/messages` routes, plus the conditional render routes (`/chatbot/demo`, `/chatbot/test-fixture`), are wrapped in the [`route_middleware`](./configuration#route-middleware) group (default: `['web']`). `GET /chatbot/health` and `GET /chatbot/widget.js` are always outside that group.
+The `POST /chatbot/messages` and `GET /chatbot/conversations/{id}/messages` routes, plus the conditional `/chatbot/test-fixture` render route, are wrapped in the [`route_middleware`](./configuration#route-middleware) group (default: `['web']`). `GET /chatbot/health` and `GET /chatbot/widget.js` are always outside that group.
 
 ## `POST /chatbot/messages`
 

@@ -14,7 +14,7 @@ use Illuminate\View\Factory as ViewFactory;
 final class PlaywrightFixtureController
 {
     /** Channels the fixture page is allowed to render. */
-    private const CHANNELS = ['playwright', 'playwright-summary', 'playwright-extractor'];
+    private const CHANNELS = ['playwright', 'playwright-summary', 'playwright-extractor', 'playwright-plain'];
 
     public function __invoke(Request $request, Repository $config, Application $app, ViewFactory $view): Response
     {

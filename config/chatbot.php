@@ -13,8 +13,8 @@ return [
     | Route middleware group
     |--------------------------------------------------------------------------
     | Middleware wrapping the stateful package routes (POST /chatbot/messages,
-    | GET /chatbot/conversations/{id}/messages) and the widget-hosting render
-    | routes (demo, test-fixture). Defaults to ['web'], which brings session,
+    | GET /chatbot/conversations/{id}/messages) and the widget-hosting
+    | test-fixture render route. Defaults to ['web'], which brings session,
     | cookie encryption, and CSRF protection as a second, independent barrier
     | behind the signed context envelope. The stateless GET /chatbot/health and
     | the cacheable GET /chatbot/widget.js stay outside the group regardless.
@@ -176,17 +176,6 @@ return [
     | Extend this list to neutralize additional injection vectors.
     */
     'sanitizer_tags' => ['context', 'system', 'instructions', 'assistant', 'user'],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Demo mode
-    |--------------------------------------------------------------------------
-    | When enabled, the /chatbot/demo route is active and LLMClient is bound
-    | to FakeClient with canned replies. NEVER enable in production.
-    */
-    'demo' => [
-        'enabled' => (bool) env('CHATBOT_DEMO', false),
-    ],
 
     /*
     |--------------------------------------------------------------------------

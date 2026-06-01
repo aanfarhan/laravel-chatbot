@@ -5,7 +5,6 @@ All commands live under the `chatbot:` namespace.
 | Command | Purpose |
 | --- | --- |
 | [`chatbot:install`](#install) | Publish config, run migrations, write `.env`, inject Blade snippet. Idempotent. |
-| [`chatbot:demo`](#demo) | Scaffold a demo route + fake LLM driver for evaluation. |
 | [`chatbot:make-tool`](#make-tool) | Scaffold a new `ChatbotTool` class. |
 | [`chatbot:inspect-prompt`](#inspect-prompt) | Dump the assembled prompt for a route as the LLM would receive it. |
 | [`chatbot:prune`](#prune) | Hard-delete conversations past the retention window. |
@@ -23,14 +22,6 @@ php artisan chatbot:install
 Publishes `config/chatbot.php`, runs the package migrations, prompts for `base_url` / `api_key` / `model` and writes them to `.env`, then injects `@chatbot` into your primary layout immediately before `</body>`.
 
 Safe to re-run. Skips steps already done.
-
-## `chatbot:demo` {#demo}
-
-```bash
-php artisan chatbot:demo
-```
-
-Scaffolds a `/chatbot/demo` route. Setting `CHATBOT_DEMO=true` (or `chatbot.demo.enabled=true`) binds `LLMClient` to `FakeClient` so the page works without an API key. Never enable in production.
 
 ## `chatbot:make-tool` {#make-tool}
 

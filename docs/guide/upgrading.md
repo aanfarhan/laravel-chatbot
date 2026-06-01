@@ -18,6 +18,10 @@ diff config/chatbot.php vendor/aanfarhan/laravel-chatbot/config/chatbot.php
 
 ## Recent breaking changes
 
+### Demo mode removed
+
+The `chatbot:demo` command, `/chatbot/demo` route, and `chatbot.demo` config block (`CHATBOT_DEMO` env) have been removed. `/chatbot/demo` now 404s and `CHATBOT_DEMO` is inert. To verify an install without spending tokens, bind the still-public `Chatbot::fake()` in a feature test (see [Testing](./testing) and the [Verify the install](./installation#verify-the-install) recipe). Feature showcases now live in a separate project. See [ADR-0010](/adr/0010-demo-lives-in-a-separate-showcase-project).
+
 ### Reserved extractor name: `blade-snapshot`
 
 The extractor name `blade-snapshot` is now reserved by the package for the [`@chatbotSnapshot`](./client-extractors#blade-snapshot-directive) Blade directive. Registering an extractor under that name on either the PHP `ClientExtractorRegistry` or the JS widget registry throws. If you had a host-side extractor by that name, rename it. See [ADR-0005](/adr/0005-blade-snapshot-rides-the-client-extractor-pipeline).

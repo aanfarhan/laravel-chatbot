@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Aanfarhan\Chatbot;
 
 use Aanfarhan\Chatbot\Blade\BladeSnapshotCompiler;
-use Aanfarhan\Chatbot\Clients\FakeClient;
 use Aanfarhan\Chatbot\Clients\OpenAiCompatibleClient;
 use Aanfarhan\Chatbot\Config\ChannelSettings;
 use Aanfarhan\Chatbot\Config\Defaults;
@@ -143,13 +142,6 @@ final class ChatbotServiceProvider extends ServiceProvider
                 return new PlaywrightFixtureClient;
             }
 
-            if ($config->get('chatbot.demo.enabled', false)) {
-                return (new FakeClient)
-                    ->respondWithStream(['Sure! ', 'Order #ORD-1042 ', 'has been shipped ', 'and should arrive ', 'within 2–3 business days.'])
-                    ->respondWithStream(['Is there ', 'anything else ', 'I can help you with?'])
-                    ->respondWithStream(['Happy to help! ', 'Feel free to ask me anything ', 'about your order.']);
-            }
-
             return new OpenAiCompatibleClient(
                 new GuzzleClient,
                 baseUrl: $config->string('chatbot.base_url'),
@@ -163,7 +155,6 @@ final class ChatbotServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadRoutesFrom(__DIR__.'/../routes/chatbot.php');
-        $this->loadRoutesFrom(__DIR__.'/../routes/chatbot-demo.php');
         $this->loadRoutesFrom(__DIR__.'/../routes/chatbot-fixture.php');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'chatbot');
 
@@ -172,7 +163,6 @@ final class ChatbotServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Console\InstallCommand::class,
-                Console\DemoCommand::class,
                 Console\PruneCommand::class,
                 Console\DeleteUserCommand::class,
                 Console\ExportUserCommand::class,
@@ -242,5 +232,11 @@ final class ChatbotServiceProvider extends ServiceProvider
         $chatbot->setChannelAllowlist('playwright-extractor', []);
         $chatbot->setChannelGreeting('playwright-extractor', 'Hi! Ask me about your order.');
         $config->set('chatbot.channels.playwright-extractor.allowed_extractors', ['blade-snapshot']);
+
+        // Plain channel: no tools, no extractors. The fixture client falls
+        // through to its canned text stream, giving the widget specs a simple
+        // request → streamed-reply path to assert mount + typing-dot behaviour.
+        $chatbot->setChannelAllowlist('playwright-plain', []);
+        $chatbot->setChannelGreeting('playwright-plain', 'Hi! Ask me about your order.');
     }
 }

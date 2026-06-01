@@ -25,7 +25,7 @@ export default defineConfig({
   },
   webServer: {
     command: `vendor/bin/testbench serve --host=127.0.0.1 --port=${PORT} --no-reload`,
-    url: `${BASE_URL}/chatbot/demo`,
+    url: `${BASE_URL}/chatbot/test-fixture`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     stdout: 'pipe',

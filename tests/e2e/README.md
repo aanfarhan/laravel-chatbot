@@ -16,7 +16,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-That script rebuilds the widget bundle (`vite build` → `dist/chatbot-widget.js`, which `/chatbot/widget.js` serves), then runs Playwright. Playwright's `webServer` block boots `vendor/bin/testbench serve` on port `8765` (override with `CHATBOT_E2E_PORT`) with `CHATBOT_DEMO=true`, and a global setup step migrates a file-backed SQLite database at `tests/e2e/e2e.sqlite` so per-request boots share state.
+That script rebuilds the widget bundle (`vite build` → `dist/chatbot-widget.js`, which `/chatbot/widget.js` serves), then runs Playwright. Playwright's `webServer` block boots `vendor/bin/testbench serve` on port `8765` (override with `CHATBOT_E2E_PORT`) with `CHATBOT_PLAYWRIGHT_FIXTURE=1`, and a global setup step migrates a file-backed SQLite database at `tests/e2e/e2e.sqlite` so per-request boots share state.
 
 ## Determinism
 

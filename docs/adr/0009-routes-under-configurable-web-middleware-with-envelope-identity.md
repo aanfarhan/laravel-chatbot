@@ -1,5 +1,7 @@
 # Widget-bearing and write routes ship under a configurable middleware group, defaulting to `web`
 
+> **Amended by [ADR 0010](0010-demo-lives-in-a-separate-showcase-project.md):** the `GET /chatbot/demo` route referenced below was removed. The Playwright fixture page now stands alone as the integration model.
+
 ## Context
 
 The package loaded its routes with `loadRoutesFrom` and no `Route::middleware(...)` group. So `POST /chatbot/messages` ran with no `VerifyCsrfToken`, no `StartSession`, no `EncryptCookies` — none of Laravel's `web` stack.

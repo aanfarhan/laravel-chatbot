@@ -1,5 +1,39 @@
 # Upgrade guide
 
+## v1.5.0 — Demo mode removed
+
+**Breaking.** The demo trio is gone: the `chatbot:demo` command, the
+`GET /chatbot/demo` route and its `DemoController`, the demo Blade view, and the
+`chatbot.demo` config block (`CHATBOT_DEMO` env). The service provider no longer
+binds `LLMClient` to a `FakeClient` based on `chatbot.demo.enabled`.
+
+Effects after upgrade:
+
+- `/chatbot/demo` returns **404**.
+- `chatbot.demo` / `CHATBOT_DEMO` are **inert** — setting them does nothing.
+- A dev who relied on `CHATBOT_DEMO=true` for a no-API-key fake driver now falls
+  through to the real `OpenAiCompatibleClient` (with whatever `CHATBOT_API_KEY`
+  is set, possibly empty).
+
+### What you must do
+
+- Remove `CHATBOT_DEMO` from any `.env` and drop the `demo` block when you next
+  reconcile `config/chatbot.php`.
+- To confirm the widget works without spending tokens, bind the fake client in a
+  feature test instead — `Chatbot::fake()` is unchanged and still public:
+
+```php
+use Aanfarhan\Chatbot\Facades\Chatbot;
+use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
+
+$fake = Chatbot::fake();        // binds LLMClient to an in-memory fake
+$fake->addReply('Hello from the fake client.');
+```
+
+See the [Testing guide](docs/guide/testing.md) and
+[ADR-0010](docs/adr/0010-demo-lives-in-a-separate-showcase-project.md) for the
+rationale. Feature showcases now live in a separate project, not the package.
+
 ## Next major — Package routes ship under `web` middleware by default
 
 **Breaking.** Package routes now load under a host-configurable middleware

@@ -40,15 +40,29 @@ php artisan chatbot:install
 
 ## Verify the install
 
-```bash
-php artisan chatbot:demo
+Confirm the widget renders and a full chat round-trips without spending tokens by binding the fake LLM client in a feature test:
+
+```php
+use Aanfarhan\Chatbot\Facades\Chatbot;
+use Aanfarhan\Chatbot\Testing\InteractsWithChatbot;
+
+uses(InteractsWithChatbot::class);
+
+it('renders the chatbot widget and replies', function () {
+    $fake = Chatbot::fake();
+    $fake->addReply('Hello from the fake client.');
+
+    $page  = $this->get('/');                 // any page that renders @chatbot
+    $token = $this->extractSignedContext($page);
+
+    $this->post('/chatbot/messages', [
+        'signed_context' => $token,
+        'message'        => 'Hi',
+    ])->assertOk();
+});
 ```
 
-This scaffolds a `/chatbot/demo` route bound to an in-memory fake LLM driver so you can confirm the widget renders end-to-end without spending tokens.
-
-::: warning
-Never enable `chatbot.demo.enabled` in production. It binds `LLMClient` to a fake driver and exposes the demo route publicly.
-:::
+`Chatbot::fake()` binds `LLMClient` to an in-memory fake, so the round-trip never hits a real provider. See [Testing](/guide/testing) for the full fake-client surface.
 
 ## Manual installation (if you skipped the wizard)
 

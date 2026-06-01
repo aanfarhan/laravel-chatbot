@@ -20,8 +20,8 @@ use Aanfarhan\Chatbot\Responses\StreamChunk;
  *   no tool-result yet, this emits a tool call for `lookup_order`.
  * - When the conversation already contains a tool result, it streams a final
  *   text answer.
- * - Otherwise (the demo channel, no tools), it streams the canned demo chunks
- *   so the existing /chatbot/demo spec keeps working with the same binding.
+ * - Otherwise (a tool-less channel such as `playwright-plain`), it streams the
+ *   canned text chunks, giving the widget specs a plain request → reply path.
  */
 final class PlaywrightFixtureClient implements LLMClient
 {

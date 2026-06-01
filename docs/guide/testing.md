@@ -116,4 +116,3 @@ Useful when a test fails because the LLM "isn't seeing" expected context — the
 ## See also
 
 - [Testing helpers reference](/reference/testing-helpers)
-- [Configuration — demo mode](/reference/configuration#demo)

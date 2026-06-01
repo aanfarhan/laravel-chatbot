@@ -7,7 +7,7 @@ All keys live in `config/chatbot.php`, published by `php artisan chatbot:install
 | Key | Env | Default | Description |
 | --- | --- | --- | --- |
 | `base_url` | `CHATBOT_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible chat-completions base URL. |
-| `api_key` | `CHATBOT_API_KEY` | _(unset)_ | API key for the provider. Required outside demo mode. |
+| `api_key` | `CHATBOT_API_KEY` | _(unset)_ | API key for the provider. Required in normal operation; in tests `Chatbot::fake()` binds an in-memory client instead. |
 | `model` | `CHATBOT_MODEL` | `gpt-4o-mini` | Default model name. Overridable per channel. |
 | `provider.supports_tools` | `CHATBOT_PROVIDER_SUPPORTS_TOOLS` | `true` | Set `false` for providers that do not implement OpenAI's `tools` field (some self-hosted Ollama configs). When `false`, the tool registry is not consulted. |
 
@@ -15,7 +15,7 @@ All keys live in `config/chatbot.php`, published by `php artisan chatbot:install
 
 | Key | Env | Default | Description |
 | --- | --- | --- | --- |
-| `route_middleware` | `CHATBOT_ROUTE_MIDDLEWARE` | `['web']` | Middleware applied to the stateful routes (`POST /chatbot/messages`, `GET /chatbot/conversations/{id}/messages`) and the optional render routes (demo, test-fixture). `GET /chatbot/health` and `GET /chatbot/widget.js` are always outside this group. Set the env var to a comma-separated list to override (e.g. `web,throttle:api`); set it to an empty string to opt out entirely. Identity always rides the signed envelope, so both the write and history paths function correctly under any value, including `[]`. See [ADR-0009](/adr/0009-routes-under-configurable-web-middleware-with-envelope-identity). |
+| `route_middleware` | `CHATBOT_ROUTE_MIDDLEWARE` | `['web']` | Middleware applied to the stateful routes (`POST /chatbot/messages`, `GET /chatbot/conversations/{id}/messages`) and the optional `test-fixture` render route. `GET /chatbot/health` and `GET /chatbot/widget.js` are always outside this group. Set the env var to a comma-separated list to override (e.g. `web,throttle:api`); set it to an empty string to opt out entirely. Identity always rides the signed envelope, so both the write and history paths function correctly under any value, including `[]`. See [ADR-0009](/adr/0009-routes-under-configurable-web-middleware-with-envelope-identity). |
 
 ## Conversation lifecycle
 
@@ -99,12 +99,6 @@ Named channels override any top-level key. Keys absent from a channel block fall
 | `extractor_size_cap_bytes` | `8192` | Per-extractor result size cap. |
 
 Runtime overrides via [`ChannelScope`](./channel-scope) take precedence over config.
-
-## Demo
-
-| Key | Env | Default | Description |
-| --- | --- | --- | --- |
-| `demo.enabled` | `CHATBOT_DEMO` | `false` | When `true`, the `/chatbot/demo` route is active and `LLMClient` is bound to `FakeClient`. **Never enable in production.** |
 
 ## Internal keys
 

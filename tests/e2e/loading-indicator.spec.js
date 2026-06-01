@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('typing-dots loading indicator', () => {
-  test('widget mounts on /chatbot/demo', async ({ page }) => {
-    await page.goto('/chatbot/demo')
+  test('widget mounts on the fixture page', async ({ page }) => {
+    await page.goto('/chatbot/test-fixture?channel=playwright-plain')
 
     const widget = page.locator('chatbot-widget')
     await expect(widget).toBeAttached()
@@ -15,7 +15,7 @@ test.describe('typing-dots loading indicator', () => {
   })
 
   test('dots show while stream pending and disappear after completion', async ({ page }) => {
-    await page.goto('/chatbot/demo')
+    await page.goto('/chatbot/test-fixture?channel=playwright-plain')
 
     let release
     const gate = new Promise((resolve) => { release = resolve })
@@ -35,6 +35,6 @@ test.describe('typing-dots loading indicator', () => {
     release()
 
     await expect(dots).toHaveCount(0)
-    await expect(widget.locator('.message-assistant')).toContainText('Order')
+    await expect(widget.locator('.message-assistant').last()).toContainText('Order')
   })
 })
