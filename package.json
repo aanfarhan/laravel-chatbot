@@ -1,6 +1,7 @@
 {
   "name": "@aanfarhan/chatbot-widget",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "vite build",
