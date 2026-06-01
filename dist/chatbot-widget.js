@@ -32,7 +32,7 @@ class Js extends EventTarget {
       l += o.decode(h, { stream: !0 });
       const f = l.split(`
 `);
-      l = f.pop() ?? "";
+      l = f.pop();
       for (const g of f) {
         if (x(this, me)) break;
         g === "" ? R(this, Ne, null) : m(this, Rt, ls).call(this, g);
@@ -2461,7 +2461,7 @@ W = new WeakMap(), et = new WeakMap(), re = new WeakMap(), Me = new WeakMap(), g
   if (e.length === 0) return "";
   const n = /* @__PURE__ */ new Map(), s = [], i = /^[a-z][a-z0-9_-]*$/;
   for (const l of e) {
-    const c = l.getAttribute("data-chatbot-snapshot") ?? "";
+    const c = l.getAttribute("data-chatbot-snapshot");
     if (!i.test(c)) {
       console.warn(`@chatbotSnapshot label '${c}' is invalid; section dropped.`);
       continue;
