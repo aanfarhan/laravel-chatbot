@@ -2,13 +2,11 @@
 
 Use `/Users/farhan/Library/Application Support/Herd/bin/php82` to run PHP commands (tests, artisan, etc.). This matches the package's minimum supported version (`php: ^8.2`), so local runs exercise the floor that CI guards. The system default `php` may differ; use the Herd binary explicitly.
 
-## Code formatting
+## Formatting & static analysis
 
-After every PHP file change or new PHP file creation, run `vendor/bin/pint` to auto-fix formatting. Do not skip this — the CI runs `vendor/bin/pint --test` and will fail if formatting is off.
+Do NOT run `pint` or `phpstan` after every edit — during a red-green loop run only the focused test. A `pre-push` git hook runs the CI-parity checks (`pint --test` + `phpstan analyse --memory-limit=512M`, php82) automatically, gated on whether the push touches `*.php`, so they stay out of the loop's context.
 
-## Static analysis
-
-After every PHP file change or new PHP file creation, run `vendor/bin/phpstan analyse --memory-limit=512M` to check for type errors. Do not skip this — the CI runs PHPStan at level 9 and will fail if there are errors.
+When a push is blocked: run `composer format` to auto-fix formatting, and fix the phpstan errors it reports (CI runs PHPStan at level 9). You may also run these manually before pushing if you want an early check.
 
 ## Agent skills
 
