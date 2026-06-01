@@ -9,3 +9,5 @@
 /test-results
 /playwright-report
 /tests/e2e/e2e.sqlite
+/coverage
+/overview.html
