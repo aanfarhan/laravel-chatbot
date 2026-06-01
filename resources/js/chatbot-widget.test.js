@@ -2,6 +2,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import './chatbot-widget.js'
 
+// jsdom has no scrollIntoView; the widget calls it after every append. Stub it
+// once globally so async connectedCallback paths (greeting/history load) don't
+// leak unhandled rejections that fail the run even when assertions pass.
+Element.prototype.scrollIntoView = function () {}
+
 function makeWidget() {
   const el = document.createElement('chatbot-widget')
   el.setAttribute('position', 'inline')
@@ -230,9 +235,6 @@ describe('chatbot-widget send-flow guards & request shaping', () => {
     localStorage.clear()
     originalFetch = globalThis.fetch
     captured = setupFetchCapture()
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = function () {}
-    }
     widget = makeWidget()
   })
 
@@ -353,9 +355,6 @@ describe('chatbot-widget stream-error rendering branches', () => {
     document.body.innerHTML = ''
     localStorage.clear()
     originalFetch = globalThis.fetch
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = function () {}
-    }
     widget = makeWidget()
   })
 
@@ -431,9 +430,6 @@ describe('chatbot-widget context-summary, appendAssistant text & hideToolStatus'
     document.body.innerHTML = ''
     localStorage.clear()
     originalFetch = globalThis.fetch
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = function () {}
-    }
     widget = makeWidget()
   })
 
@@ -624,9 +620,6 @@ describe('chatbot-widget typing-dots loading indicator', () => {
     document.body.innerHTML = ''
     originalFetch = globalThis.fetch
     captured = setupFetchCapture()
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = function () {}
-    }
     widget = makeWidget()
   })
 
@@ -731,9 +724,6 @@ describe('chatbot-widget client extractors', () => {
     captured = setupFetchCapture()
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = function () {}
-    }
   })
 
   afterEach(() => {
@@ -1208,9 +1198,6 @@ describe('chatbot-widget extractor subsystem branches', () => {
     originalFetch = globalThis.fetch
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = function () {}
-    }
     widget = makeWidget()
   })
 
