@@ -203,8 +203,8 @@ final class OpenAiCompatibleClient implements LLMClient
     }
 
     /**
-     * @param array<int, array{id: string, name: string, arguments: string}> $accumulator
-     * @param array<string, mixed> $tcDelta
+     * @param  array<int, array{id: string, name: string, arguments: string}>  $accumulator
+     * @param  array<string, mixed>  $tcDelta
      */
     private function accumulateToolCallDelta(array &$accumulator, array $tcDelta): void
     {
