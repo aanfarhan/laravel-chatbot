@@ -7,6 +7,7 @@ use Aanfarhan\Chatbot\Facades\Chatbot;
 use Aanfarhan\Chatbot\Persistence\MessageRecord;
 use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\StreamCoordinator;
+use Aanfarhan\Chatbot\Support\Clock;
 use Aanfarhan\Chatbot\Tests\Stubs\SlowTool;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
@@ -43,9 +44,9 @@ it('excludes tool execution time from the stream budget so a slow tool still yie
     // Test-controlled monotonic clock. The slow tool advances it by 100s — far past
     // the 10s stream budget — yet the budget must not trip on that excluded time.
     $now = 1000.0;
-    $clock = function () use (&$now): float {
+    $clock = new Clock(function () use (&$now): float {
         return $now;
-    };
+    });
     SlowTool::$onHandle = function () use (&$now): void {
         $now += 100.0;
     };
@@ -96,12 +97,12 @@ it('still cuts a runaway loop whose accumulated model-stream time exceeds the bu
 
     // Clock advances on every read, so each round of model streaming spends budget.
     $now = 0.0;
-    $clock = function () use (&$now): float {
+    $clock = new Clock(function () use (&$now): float {
         $value = $now;
         $now += 3.0;
 
         return $value;
-    };
+    });
 
     config()->set('chatbot.stream_duration', 10);
 

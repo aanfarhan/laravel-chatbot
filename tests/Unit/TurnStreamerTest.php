@@ -8,6 +8,7 @@ use Aanfarhan\Chatbot\Contracts\ToolResolver;
 use Aanfarhan\Chatbot\Streaming\RecordingStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\TurnOutcome;
 use Aanfarhan\Chatbot\Streaming\TurnStreamer;
+use Aanfarhan\Chatbot\Support\Clock;
 use Aanfarhan\Chatbot\Tests\Stubs\SlowTool;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
 
@@ -20,7 +21,7 @@ it('returns Completed with assembled text on a clean stream', function (): void 
     $client->respondWithStream(['Hel', 'lo']);
 
     $now = 0.0;
-    $clock = fn () => $now;
+    $clock = new Clock(fn () => $now);
 
     $emitter = new RecordingStreamEmitter;
     $streamer = new TurnStreamer($client, $emitter, null, $clock);
@@ -55,7 +56,7 @@ it('returns Aborted when connection is aborted mid-stream', function (): void {
 
     $now = 0.0;
     $emitter = new RecordingStreamEmitter;
-    $streamer = new TurnStreamer($client, $emitter, null, fn () => $now);
+    $streamer = new TurnStreamer($client, $emitter, null, new Clock(fn () => $now));
 
     $calls = 0;
     $result = $streamer->run(
@@ -90,7 +91,7 @@ it('returns Failed(timeout) when stream duration is already exceeded before the 
     // clock starts past the budget
     $now = 100.0;
     $emitter = new RecordingStreamEmitter;
-    $streamer = new TurnStreamer($client, $emitter, null, fn () => $now);
+    $streamer = new TurnStreamer($client, $emitter, null, new Clock(fn () => $now));
 
     $result = $streamer->run(
         messages: [['role' => 'user', 'content' => 'hi']],
@@ -123,9 +124,9 @@ it('returns Failed(timeout) mid-stream and preserves partial assembled text', fu
     // now() is called: (1) pre-round, (2) mid-chunk for 'Part', (3) mid-chunk for 'ial'.
     // Budget fires on call 3 — timeout thrown before 'ial' is appended → assembled = 'Part'.
     $calls = 0;
-    $clock = function () use (&$calls): float {
+    $clock = new Clock(function () use (&$calls): float {
         return ++$calls === 3 ? 100.0 : 0.0;
-    };
+    });
 
     $emitter = new RecordingStreamEmitter;
     $streamer = new TurnStreamer($client, $emitter, null, $clock);
@@ -164,7 +165,7 @@ it('sends budget-exhausted message for all calls when maxCalls=0 then zeroes too
     $now = 0.0;
     $emitter = new RecordingStreamEmitter;
     // maxCalls=0: callsThisTurn(0) >= maxCalls(0) fires for every tool call → budget-exhausted
-    $streamer = new TurnStreamer($client, $emitter, null, fn () => $now);
+    $streamer = new TurnStreamer($client, $emitter, null, new Clock(fn () => $now));
 
     $result = $streamer->run(
         messages: [['role' => 'user', 'content' => 'ping']],
@@ -201,9 +202,9 @@ it('excludes tool handler time from the stream budget so a slow tool still compl
     SlowTool::reset();
 
     $now = 0.0;
-    $clock = function () use (&$now): float {
+    $clock = new Clock(function () use (&$now): float {
         return $now;
-    };
+    });
 
     // SlowTool advances the shared clock by 100s, far past the 10s budget
     SlowTool::$onHandle = function () use (&$now): void {
@@ -275,7 +276,7 @@ it('feeds back [error: no tool handler configured] when toolInvoker is null', fu
 
     $now = 0.0;
     $emitter = new RecordingStreamEmitter;
-    $streamer = new TurnStreamer($client, $emitter, null, fn () => $now);
+    $streamer = new TurnStreamer($client, $emitter, null, new Clock(fn () => $now));
 
     $result = $streamer->run(
         messages: [['role' => 'user', 'content' => 'ping']],

@@ -9,14 +9,16 @@ use Aanfarhan\Chatbot\Contracts\PersistableTool;
 use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Contracts\ToolResolver;
 use Aanfarhan\Chatbot\Streaming\StreamEmitter;
+use Aanfarhan\Chatbot\Support\Clock;
 use Aanfarhan\Chatbot\Support\Truncator;
-use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Carbon;
 
 final class ToolInvoker
 {
     private readonly ToolArgumentValidator $validator;
+
+    private readonly Clock $clock;
 
     public function __construct(
         private readonly ToolResolver $resolver,
@@ -25,9 +27,10 @@ final class ToolInvoker
         private readonly int $defaultTimeout,
         private readonly int $resultSizeCap,
         int $maxArgLength,
-        private readonly ?Closure $clock = null,
+        ?Clock $clock = null,
     ) {
         $this->validator = new ToolArgumentValidator($maxArgLength);
+        $this->clock = $clock ?? new Clock;
     }
 
     /**
@@ -37,11 +40,6 @@ final class ToolInvoker
     public function definitions(?array $allowedTools): array
     {
         return $this->resolver->definitions($allowedTools);
-    }
-
-    private function now(): float
-    {
-        return $this->clock !== null ? ($this->clock)() : microtime(true);
     }
 
     /**
@@ -56,7 +54,7 @@ final class ToolInvoker
         ?Authenticatable $actor = null,
         ?array $allowedTools = null,
     ): ToolInvocationResult {
-        $invokeStart = $this->now();
+        $invokeStart = $this->clock->now();
         $startedAt = Carbon::now();
 
         if ($allowedTools !== null && ! in_array($name, $allowedTools, true)) {
@@ -65,7 +63,7 @@ final class ToolInvoker
 
             return new ToolInvocationResult(
                 message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->now() - $invokeStart,
+                elapsedSeconds: $this->clock->now() - $invokeStart,
                 status: InvocationStatus::RejectedAllowlist,
             );
         }
@@ -78,7 +76,7 @@ final class ToolInvoker
 
             return new ToolInvocationResult(
                 message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->now() - $invokeStart,
+                elapsedSeconds: $this->clock->now() - $invokeStart,
                 status: InvocationStatus::RejectedNotFound,
             );
         }
@@ -94,7 +92,7 @@ final class ToolInvoker
 
             return new ToolInvocationResult(
                 message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->now() - $invokeStart,
+                elapsedSeconds: $this->clock->now() - $invokeStart,
                 status: InvocationStatus::RejectedSchema,
             );
         }
@@ -111,14 +109,14 @@ final class ToolInvoker
 
                 return new ToolInvocationResult(
                     message: $this->message($callId, $name, $content),
-                    elapsedSeconds: $this->now() - $invokeStart,
+                    elapsedSeconds: $this->clock->now() - $invokeStart,
                     status: InvocationStatus::RejectedUnauthorized,
                 );
             }
 
-            $deadline = $this->now() + $this->defaultTimeout;
+            $deadline = $this->clock->now() + $this->defaultTimeout;
             $raw = $tool->handle($actor, $invocation);
-            $overran = $this->now() > $deadline;
+            $overran = $this->clock->now() > $deadline;
 
             $encoded = is_array($raw) ? json_encode($raw, JSON_THROW_ON_ERROR) : (string) $raw;
             $encoded = Truncator::toByteCap($encoded, $this->resultSizeCap);
@@ -128,7 +126,7 @@ final class ToolInvoker
 
             return new ToolInvocationResult(
                 message: $this->message($callId, $name, $encoded),
-                elapsedSeconds: $this->now() - $invokeStart,
+                elapsedSeconds: $this->clock->now() - $invokeStart,
                 status: InvocationStatus::Ok,
             );
         } catch (\Throwable $e) {
@@ -138,7 +136,7 @@ final class ToolInvoker
 
             return new ToolInvocationResult(
                 message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->now() - $invokeStart,
+                elapsedSeconds: $this->clock->now() - $invokeStart,
                 status: InvocationStatus::HandlerError,
             );
         }

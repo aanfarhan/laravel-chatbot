@@ -11,8 +11,8 @@ use Aanfarhan\Chatbot\Events\ChatbotMessageCompleted;
 use Aanfarhan\Chatbot\Events\ChatbotMessageFailed;
 use Aanfarhan\Chatbot\Events\ChatbotMessageStarted;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
+use Aanfarhan\Chatbot\Support\Clock;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
-use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -24,6 +24,8 @@ final class StreamCoordinator
 {
     private const CACHE_COUNTER_KEY = 'chatbot.active_streams';
 
+    private readonly Clock $clock;
+
     private readonly TurnStreamer $turnStreamer;
 
     public function __construct(
@@ -33,20 +35,12 @@ final class StreamCoordinator
         private readonly ?CacheRepository $cache = null,
         private readonly ?Dispatcher $events = null,
         private readonly ?LoggerInterface $logger = null,
-        private readonly ?Closure $clock = null,
+        ?Clock $clock = null,
         private readonly StreamEmitter $emitter = new SseStreamEmitter,
         private readonly ?ToolInvoker $toolInvoker = null,
     ) {
-        $this->turnStreamer = new TurnStreamer($llm, $emitter, $toolInvoker, $clock);
-    }
-
-    /**
-     * Monotonic wall-clock source in seconds. Injectable so timing-dependent
-     * behaviour (the stream budget) is testable without real sleeps.
-     */
-    private function now(): float
-    {
-        return $this->clock !== null ? ($this->clock)() : microtime(true);
+        $this->clock = $clock ?? new Clock;
+        $this->turnStreamer = new TurnStreamer($llm, $emitter, $toolInvoker, $this->clock);
     }
 
     /**
@@ -86,7 +80,7 @@ final class StreamCoordinator
             $actor,
         ): void {
             $this->incrementCounter();
-            $startedAt = $this->now();
+            $startedAt = $this->clock->now();
 
             $resolvedModel = $model ?? $this->config->string('chatbot.model', '');
 
@@ -134,7 +128,7 @@ final class StreamCoordinator
                 $this->decrementCounter();
             }
 
-            $durationMs = (int) round(($this->now() - $startedAt) * 1000);
+            $durationMs = (int) round(($this->clock->now() - $startedAt) * 1000);
 
             match ($result->outcome) {
                 TurnOutcome::Aborted => null,

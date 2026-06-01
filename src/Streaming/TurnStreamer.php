@@ -8,22 +8,21 @@ use Aanfarhan\Chatbot\Contracts\LLMClient;
 use Aanfarhan\Chatbot\Exceptions\ChatbotException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotTimeoutException;
 use Aanfarhan\Chatbot\Responses\StreamChunk;
+use Aanfarhan\Chatbot\Support\Clock;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
-use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 final class TurnStreamer
 {
+    private readonly Clock $clock;
+
     public function __construct(
         private readonly LLMClient $llm,
         private readonly StreamEmitter $emitter,
         private readonly ?ToolInvoker $toolInvoker = null,
-        private readonly ?Closure $clock = null,
-    ) {}
-
-    private function now(): float
-    {
-        return $this->clock !== null ? ($this->clock)() : microtime(true);
+        ?Clock $clock = null,
+    ) {
+        $this->clock = $clock ?? new Clock;
     }
 
     /**
@@ -52,7 +51,7 @@ final class TurnStreamer
 
         try {
             while (true) {
-                if (($this->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
+                if (($this->clock->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
                     throw new ChatbotTimeoutException('stream duration exceeded');
                 }
 
@@ -64,7 +63,7 @@ final class TurnStreamer
                         return new TurnResult($assembled, $usage, TurnOutcome::Aborted, null);
                     }
 
-                    if (($this->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
+                    if (($this->clock->now() - $startedAt - $toolTimeSpent) >= $streamDuration) {
                         throw new ChatbotTimeoutException('stream duration exceeded');
                     }
 

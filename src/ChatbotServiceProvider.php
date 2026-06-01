@@ -18,6 +18,7 @@ use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
 use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
 use Aanfarhan\Chatbot\Streaming\SseStreamEmitter;
 use Aanfarhan\Chatbot\Streaming\StreamEmitter;
+use Aanfarhan\Chatbot\Support\Clock;
 use Aanfarhan\Chatbot\Testing\Fixtures\FailingTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
@@ -118,6 +119,8 @@ final class ChatbotServiceProvider extends ServiceProvider
             },
         );
 
+        $this->app->singleton(Clock::class, fn (): Clock => new Clock);
+
         $this->app->singleton(StreamEmitter::class, fn (): StreamEmitter => new SseStreamEmitter);
 
         $this->app->singleton(ToolInvoker::class, function (Application $app): ToolInvoker {
@@ -131,6 +134,7 @@ final class ChatbotServiceProvider extends ServiceProvider
                 defaultTimeout: $config->integer('chatbot.tools.default_timeout', Defaults::DEFAULT_TIMEOUT),
                 resultSizeCap: $config->integer('chatbot.tools.result_size_cap', Defaults::RESULT_SIZE_CAP),
                 maxArgLength: $config->integer('chatbot.tools.default_max_arg_length', Defaults::MAX_ARG_LENGTH),
+                clock: $app->make(Clock::class),
             );
         });
 
