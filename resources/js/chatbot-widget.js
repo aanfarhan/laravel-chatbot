@@ -301,7 +301,7 @@ class ChatbotWidget extends HTMLElement {
     const order = []
     const labelPattern = /^[a-z][a-z0-9_-]*$/
     for (const el of markers) {
-      const label = el.getAttribute('data-chatbot-snapshot') ?? ''
+      const label = el.getAttribute('data-chatbot-snapshot')
       if (!labelPattern.test(label)) {
         console.warn(`@chatbotSnapshot label '${label}' is invalid; section dropped.`)
         continue

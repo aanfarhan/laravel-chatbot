@@ -16,6 +16,16 @@ function makeFetch(stream, status = 200) {
   return async () => ({ ok: status < 400, status, body: stream })
 }
 
+function makeChunkedStream(...chunks) {
+  const encoder = new TextEncoder()
+  return new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk))
+      controller.close()
+    },
+  })
+}
+
 // ── tracer bullet ──────────────────────────────────────────────────────────
 describe('SSEClient', () => {
   it('emits a chunk event for a token line', async () => {
@@ -166,5 +176,36 @@ describe('SSEClient', () => {
 
     expect(chunks).toHaveLength(1)
     expect(chunks[0]).toEqual({ text: 'hi' })
+  })
+
+  it('handles chunk split exactly on newline boundary (L31 empty-buffer fallback)', async () => {
+    // First chunk ends on '\n' so lines.pop() returns '' (empty trailing element).
+    // Second chunk carries the blank separator and second event.
+    const stream = makeChunkedStream(
+      'data: {"type":"token","text":"first"}\n',
+      '\ndata: {"type":"token","text":"second"}\n\n',
+    )
+    const client = new SSEClient(makeFetch(stream))
+    const chunks = []
+    client.addEventListener('chunk', (e) => chunks.push(e.detail))
+
+    await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
+
+    expect(chunks).toEqual([{ text: 'first' }, { text: 'second' }])
+  })
+
+  it('ignores non-data/non-event lines (L52 early-return branch)', async () => {
+    const stream = makeStream(
+      ': keep-alive',
+      'data: {"type":"token","text":"after comment"}',
+      '',
+    )
+    const client = new SSEClient(makeFetch(stream))
+    const chunks = []
+    client.addEventListener('chunk', (e) => chunks.push(e.detail))
+
+    await client.connect('/chatbot/messages', { method: 'POST', body: '{}' })
+
+    expect(chunks).toEqual([{ text: 'after comment' }])
   })
 })

@@ -127,3 +127,63 @@ it('starts and finds a conversation by uuid for an authenticated user', function
         ->and($found->id)->toBe($conv->id)
         ->and($found->userId)->toBe(42);
 });
+
+it('forUser returns all conversations belonging to a user', function (): void {
+    $store = app(ConversationStore::class);
+
+    $a = $store->start(channel: 'default', userId: 7, guestToken: null);
+    $b = $store->start(channel: 'support', userId: 7, guestToken: null);
+    $store->start(channel: 'default', userId: 99, guestToken: null); // another user
+
+    $results = $store->forUser(7);
+
+    expect($results)->toHaveCount(2)
+        ->and(array_column($results, 'id'))->toContain($a->id)
+        ->and(array_column($results, 'id'))->toContain($b->id);
+});
+
+it('forUser returns an empty array when the user has no conversations', function (): void {
+    $store = app(ConversationStore::class);
+
+    expect($store->forUser(999))->toBe([]);
+});
+
+it('forUser does not return soft-deleted conversations', function (): void {
+    $store = app(ConversationStore::class);
+
+    $conv = $store->start(channel: 'default', userId: 7, guestToken: null);
+    $store->delete($conv->id);
+
+    expect($store->forUser(7))->toBe([]);
+});
+
+it('anonymize strips user_id and guest_token from a conversation', function (): void {
+    $store = app(ConversationStore::class);
+
+    $conv = $store->start(channel: 'default', userId: 5, guestToken: 'tok-abc');
+    $store->anonymize($conv->id);
+
+    $found = $store->findByUuid($conv->uuid);
+
+    expect($found)->not->toBeNull()
+        ->and($found->userId)->toBeNull()
+        ->and($found->guestToken)->toBeNull();
+});
+
+it('export returns conversation metadata and messages as an array', function (): void {
+    $store = app(ConversationStore::class);
+
+    $conv = $store->start(channel: 'orders', userId: 3, guestToken: null);
+    $store->append($conv->id, 'user', 'Hello', 'orders.show', 'h1');
+    $store->append($conv->id, 'assistant', 'Hi there', 'orders.show', 'h1');
+
+    $data = $store->export($conv->id);
+
+    expect($data['id'])->toBe($conv->id)
+        ->and($data['channel'])->toBe('orders')
+        ->and($data['messages'])->toHaveCount(2)
+        ->and($data['messages'][0]['role'])->toBe('user')
+        ->and($data['messages'][0]['content'])->toBe('Hello')
+        ->and($data['messages'][1]['role'])->toBe('assistant')
+        ->and($data['messages'][0])->toHaveKey('created_at');
+});

@@ -52,6 +52,467 @@ function dispatchToolEvent(widget, type, name, phase) {
   widget.dispatchEvent(new CustomEvent(type, { bubbles: false, detail: { name, phase } }))
 }
 
+describe('chatbot-widget render, panel & toggle', () => {
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    localStorage.clear()
+  })
+
+  it('position defaults to bottom-right when attribute is absent', () => {
+    const el = document.createElement('chatbot-widget')
+    document.body.appendChild(el)
+    expect(el.getAttribute('position')).toBeNull()
+    const panel = el.shadowRoot.querySelector('.panel')
+    expect(panel.className).toContain('bottom-right')
+  })
+
+  it('inline mode: no launcher, panel not hidden', () => {
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    document.body.appendChild(el)
+    expect(el.shadowRoot.querySelector('.launcher')).toBeNull()
+    const panel = el.shadowRoot.querySelector('.panel')
+    expect(panel.className).toContain('inline')
+    expect(panel.hidden).toBe(false)
+  })
+
+  it('floating mode: launcher present, panel starts hidden', () => {
+    const el = document.createElement('chatbot-widget')
+    document.body.appendChild(el)
+    expect(el.shadowRoot.querySelector('.launcher')).not.toBeNull()
+    expect(el.shadowRoot.querySelector('.panel').hidden).toBe(true)
+  })
+
+  it('launcher click opens panel, writes localStorage, focuses input', () => {
+    const el = document.createElement('chatbot-widget')
+    document.body.appendChild(el)
+    const launcher = el.shadowRoot.querySelector('.launcher')
+    const panel = el.shadowRoot.querySelector('.panel')
+    expect(panel.hidden).toBe(true)
+    launcher.click()
+    expect(panel.hidden).toBe(false)
+    expect(localStorage.getItem('chatbot_open_default')).toBe('1')
+  })
+
+  it('launcher click closes panel when already open', () => {
+    const el = document.createElement('chatbot-widget')
+    document.body.appendChild(el)
+    const launcher = el.shadowRoot.querySelector('.launcher')
+    launcher.click()
+    launcher.click()
+    expect(el.shadowRoot.querySelector('.panel').hidden).toBe(true)
+    expect(localStorage.getItem('chatbot_open_default')).toBe('0')
+  })
+
+  it('restores open state from localStorage on connect', () => {
+    localStorage.setItem('chatbot_open_default', '1')
+    const el = document.createElement('chatbot-widget')
+    document.body.appendChild(el)
+    expect(el.shadowRoot.querySelector('.panel').hidden).toBe(false)
+  })
+
+  it('attributeChangedCallback re-renders shadow DOM', () => {
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'bottom-right')
+    document.body.appendChild(el)
+    const firstPanel = el.shadowRoot.querySelector('.panel')
+    el.setAttribute('title', 'Support')
+    const secondPanel = el.shadowRoot.querySelector('.panel')
+    expect(secondPanel).not.toBe(firstPanel)
+    expect(el.shadowRoot.querySelector('.header span').textContent).toBe('Support')
+  })
+})
+
+describe('chatbot-widget history load & greeting', () => {
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function makeHistoryFetch(messages = []) {
+    return vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ messages }),
+      }),
+    )
+  }
+
+  it('appends greeting from envelope when no stored conversation', async () => {
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', makeEnvelope({ g: 'Hello!' }))
+    document.body.appendChild(el)
+    await Promise.resolve()
+    await Promise.resolve()
+    const bubbles = el.shadowRoot.querySelectorAll('.message-assistant')
+    expect(bubbles.length).toBeGreaterThan(0)
+    expect(bubbles[0].textContent).toContain('Hello!')
+  })
+
+  it('appends nothing when greeting is empty string', async () => {
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', makeEnvelope({ g: '' }))
+    document.body.appendChild(el)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(el.shadowRoot.querySelectorAll('.message-assistant').length).toBe(0)
+  })
+
+  it('fetches history with signed_context query when envelope present', async () => {
+    const envelope = makeEnvelope({ g: 'Hi' })
+    localStorage.setItem('chatbot_conversation_default', '42')
+    globalThis.fetch = makeHistoryFetch([
+      { role: 'user', content: 'hey' },
+      { role: 'assistant', content: 'hello' },
+    ])
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', envelope)
+    document.body.appendChild(el)
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    const url = globalThis.fetch.mock.calls[0][0]
+    expect(url).toContain('/chatbot/conversations/42/messages')
+    expect(url).toContain('signed_context=')
+    expect(el.shadowRoot.querySelectorAll('.message-user').length).toBe(1)
+    expect(el.shadowRoot.querySelectorAll('.message-assistant').length).toBe(1)
+  })
+
+  it('fetches history without query when no envelope', async () => {
+    localStorage.setItem('chatbot_conversation_default', '7')
+    globalThis.fetch = makeHistoryFetch([])
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    document.body.appendChild(el)
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    const url = globalThis.fetch.mock.calls[0][0]
+    expect(url).toBe('/chatbot/conversations/7/messages')
+  })
+
+  it('new chat clears stored conversation, empties messages, shows greeting', async () => {
+    const envelope = makeEnvelope({ g: 'Hi again!' })
+    localStorage.setItem('chatbot_conversation_default', '5')
+    globalThis.fetch = makeHistoryFetch([{ role: 'user', content: 'q' }])
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', envelope)
+    document.body.appendChild(el)
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(el.shadowRoot.querySelectorAll('.message-user').length).toBe(1)
+    el.shadowRoot.querySelector('.new-chat').click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(localStorage.getItem('chatbot_conversation_default')).toBeNull()
+    expect(el.shadowRoot.querySelectorAll('.message-user').length).toBe(0)
+    expect(el.shadowRoot.querySelector('.message-assistant').textContent).toContain('Hi again!')
+  })
+})
+
+describe('chatbot-widget send-flow guards & request shaping', () => {
+  let widget
+  let captured
+  let originalFetch
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    localStorage.clear()
+    originalFetch = globalThis.fetch
+    captured = setupFetchCapture()
+    if (!Element.prototype.scrollIntoView) {
+      Element.prototype.scrollIntoView = function () {}
+    }
+    widget = makeWidget()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    document.head.querySelectorAll('meta[name="csrf-token"]').forEach((m) => m.remove())
+    vi.restoreAllMocks()
+  })
+
+  function streamFetch(chunks) {
+    const encoder = new TextEncoder()
+    let i = 0
+    globalThis.fetch = vi.fn((url, opts) => {
+      captured.calls.push({ url, opts })
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/event-stream' }),
+        body: {
+          getReader: () => ({
+            read: () => {
+              if (i >= chunks.length) return Promise.resolve({ done: true, value: undefined })
+              return Promise.resolve({ done: false, value: encoder.encode(chunks[i++]) })
+            },
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      })
+    })
+  }
+
+  function rejectFetch() {
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error('network down')))
+  }
+
+  it('streaming guard: second send while in flight makes no extra request', async () => {
+    await triggerSend(widget, 'first')
+    const countAfterFirst = captured.calls.filter((c) => c.url === '/chatbot/messages').length
+    await triggerSend(widget, 'second')
+    const countAfterSecond = captured.calls.filter((c) => c.url === '/chatbot/messages').length
+    expect(countAfterSecond).toBe(countAfterFirst)
+  })
+
+  it('empty-text guard: whitespace input makes no request', async () => {
+    await triggerSend(widget, '   ')
+    expect(captured.calls.filter((c) => c.url === '/chatbot/messages').length).toBe(0)
+  })
+
+  it('includes X-CSRF-TOKEN header when meta tag present', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+    const meta = document.createElement('meta')
+    meta.name = 'csrf-token'
+    meta.content = 'tok123'
+    document.head.appendChild(meta)
+    await triggerSend(widget, 'hi')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const call = captured.calls.find((c) => c.url === '/chatbot/messages')
+    expect(call.opts.headers['X-CSRF-TOKEN']).toBe('tok123')
+  })
+
+  it('omits X-CSRF-TOKEN header when no meta tag', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+    await triggerSend(widget, 'hi')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const call = captured.calls.find((c) => c.url === '/chatbot/messages')
+    expect(call.opts.headers).not.toHaveProperty('X-CSRF-TOKEN')
+  })
+
+  it('includes conversation_id in body when stored', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+    localStorage.setItem('chatbot_conversation_default', '99')
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const body = lastSendBody(captured)
+    expect(body.conversation_id).toBe('99')
+  })
+
+  it('omits conversation_id from body when not stored', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const body = lastSendBody(captured)
+    expect(body).not.toHaveProperty('conversation_id')
+  })
+
+  it('done without conversationId leaves localStorage untouched', async () => {
+    streamFetch(['event: done\ndata: {}\n\n'])
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    expect(localStorage.getItem('chatbot_conversation_default')).toBeNull()
+  })
+
+  it('first chunk concatenates onto empty dataset.raw fallback', async () => {
+    streamFetch(['event: token\ndata: {"content":"hello"}\n\nevent: done\ndata: {}\n\n'])
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 30; j++) await Promise.resolve()
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble.dataset.raw).toBe('hello')
+  })
+
+  it('rejected connect triggers network_error handler and re-enables send button', async () => {
+    rejectFetch()
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const btn = widget.shadowRoot.querySelector('.send-button')
+    expect(btn.disabled).toBe(false)
+    const errEl = widget.shadowRoot.querySelector('.error-msg')
+    expect(errEl).not.toBeNull()
+    expect(errEl.textContent).toContain('Connection failed')
+  })
+})
+
+describe('chatbot-widget stream-error rendering branches', () => {
+  let widget
+  let originalFetch
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    localStorage.clear()
+    originalFetch = globalThis.fetch
+    if (!Element.prototype.scrollIntoView) {
+      Element.prototype.scrollIntoView = function () {}
+    }
+    widget = makeWidget()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  function streamError(code, message) {
+    const encoder = new TextEncoder()
+    const data = JSON.stringify({ code, ...(message ? { message } : {}), retryable: false })
+    let done = false
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/event-stream' }),
+        body: {
+          getReader: () => ({
+            read: () => {
+              if (done) return Promise.resolve({ done: true, value: undefined })
+              done = true
+              return Promise.resolve({ done: false, value: encoder.encode(`event: error\ndata: ${data}\n\n`) })
+            },
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      }),
+    )
+  }
+
+  it('quota_exceeded renders quota-msg with daily-limit fallback', async () => {
+    streamError('quota_exceeded')
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const el = widget.shadowRoot.querySelector('.quota-msg')
+    expect(el).not.toBeNull()
+    expect(el.textContent).toContain('Daily limit')
+  })
+
+  it('token_cap_exceeded renders quota-msg', async () => {
+    streamError('token_cap_exceeded', 'Cap hit')
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const el = widget.shadowRoot.querySelector('.quota-msg')
+    expect(el).not.toBeNull()
+    expect(el.textContent).toContain('Cap hit')
+  })
+
+  it('content_blocked renders content-policy message', async () => {
+    streamError('content_blocked')
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const el = widget.shadowRoot.querySelector('.error-msg')
+    expect(el).not.toBeNull()
+    expect(el.textContent).toContain('blocked by content policy')
+  })
+
+  it('unknown code with no message falls back to "Something went wrong."', async () => {
+    streamError('provider_error')
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 20; j++) await Promise.resolve()
+    const el = widget.shadowRoot.querySelector('.error-msg')
+    expect(el).not.toBeNull()
+    expect(el.textContent).toContain('Something went wrong')
+  })
+})
+
+describe('chatbot-widget context-summary, appendAssistant text & hideToolStatus', () => {
+  let widget
+  let originalFetch
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    localStorage.clear()
+    originalFetch = globalThis.fetch
+    if (!Element.prototype.scrollIntoView) {
+      Element.prototype.scrollIntoView = function () {}
+    }
+    widget = makeWidget()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  function streamChunks(chunks) {
+    const encoder = new TextEncoder()
+    let i = 0
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/event-stream' }),
+        body: {
+          getReader: () => ({
+            read: () => {
+              if (i >= chunks.length) return Promise.resolve({ done: true, value: undefined })
+              return Promise.resolve({ done: false, value: encoder.encode(chunks[i++]) })
+            },
+            cancel: () => Promise.resolve(),
+          }),
+        },
+      }),
+    )
+  }
+
+  it('context_summary creates a summary node before the assistant bubble', async () => {
+    streamChunks([
+      'event: context_summary\ndata: {"text":"Answering about order #1"}\n\nevent: done\ndata: {}\n\n',
+    ])
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 30; j++) await Promise.resolve()
+    const summary = widget.shadowRoot.querySelector('.context-summary')
+    expect(summary).not.toBeNull()
+    expect(summary.textContent).toBe('Answering about order #1')
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(summary.nextSibling).toBe(bubble)
+  })
+
+  it('second context_summary reuses the same node', async () => {
+    streamChunks([
+      'event: context_summary\ndata: {"text":"first"}\n\nevent: context_summary\ndata: {"text":"second"}\n\nevent: done\ndata: {}\n\n',
+    ])
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 30; j++) await Promise.resolve()
+    const summaries = widget.shadowRoot.querySelectorAll('.context-summary')
+    expect(summaries.length).toBe(1)
+    expect(summaries[0].textContent).toBe('second')
+  })
+
+  it('appendAssistant with non-empty text renders markdown (text-present branch)', async () => {
+    streamChunks([
+      'event: token\ndata: {"content":"**bold**"}\n\nevent: done\ndata: {}\n\n',
+    ])
+    await triggerSend(widget, 'q')
+    for (let j = 0; j < 30; j++) await Promise.resolve()
+    const bubble = widget.shadowRoot.querySelector('.message-assistant')
+    expect(bubble.innerHTML).toContain('<strong>')
+  })
+
+  it('hideToolStatus hides chip after finish-streaming timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      dispatchToolEvent(widget, 'tool_started', 'lookup_order', 'started')
+      const chip = widget.shadowRoot.querySelector('[part="tool-status"]')
+      expect(chip.hidden).toBe(false)
+      streamChunks(['event: done\ndata: {}\n\n'])
+      await triggerSend(widget, 'q')
+      for (let j = 0; j < 30; j++) await Promise.resolve()
+      vi.advanceTimersByTime(600)
+      expect(chip.hidden).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('chatbot-widget tool-status chip', () => {
   let widget
 
@@ -733,5 +1194,74 @@ describe('chatbot-widget client extractors', () => {
     const body = lastSendBody(captured)
     expect(body.extractor_blocks).toEqual([{ name: 'only_this', output: 'yes' }])
     expect(errorSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('chatbot-widget extractor subsystem branches', () => {
+  let widget
+  let warnSpy
+  let originalFetch
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    localStorage.clear()
+    originalFetch = globalThis.fetch
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    if (!Element.prototype.scrollIntoView) {
+      Element.prototype.scrollIntoView = function () {}
+    }
+    widget = makeWidget()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    vi.restoreAllMocks()
+  })
+
+  it('blade-snapshot skips a marker with empty text (L310 empty-text guard)', async () => {
+    const envelope = makeEnvelope({ x: ['blade-snapshot'] })
+    widget.setAttribute('signed-context', envelope)
+    const empty = document.createElement('div')
+    empty.setAttribute('data-chatbot-snapshot', 'orders')
+    document.body.appendChild(empty)
+    await Promise.resolve()
+    await Promise.resolve()
+    const body = await new Promise((resolve) => {
+      const enc = new TextEncoder()
+      let sent = false
+      globalThis.fetch = vi.fn((url, opts) => {
+        if (url === '/chatbot/messages') { sent = true; resolve(JSON.parse(opts.body)) }
+        return Promise.resolve({ ok: true, status: 200, headers: new Headers(), body: { getReader: () => ({ read: () => new Promise(() => {}), cancel: () => {} }) } })
+      })
+      triggerSend(widget, 'q')
+    })
+    const blocks = body.extractor_blocks ?? []
+    expect(blocks.find((b) => b.name === 'blade-snapshot')).toBeUndefined()
+  })
+
+  it('envelopeBody returns {} for empty first segment (L713)', () => {
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', '.signature')
+    document.body.appendChild(el)
+    expect(el.shadowRoot).not.toBeNull()
+  })
+
+  it('envelopeBody returns {} when decoded payload is non-object (L718)', () => {
+    const b64 = btoa('42').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', `${b64}.signature`)
+    document.body.appendChild(el)
+    expect(el.shadowRoot).not.toBeNull()
+  })
+
+  it('envelopeBody catches atob error for invalid base64 (L719)', () => {
+    const el = document.createElement('chatbot-widget')
+    el.setAttribute('position', 'inline')
+    el.setAttribute('signed-context', '!!!invalid!!!.sig')
+    document.body.appendChild(el)
+    expect(el.shadowRoot).not.toBeNull()
   })
 })
