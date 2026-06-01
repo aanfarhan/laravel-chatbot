@@ -58,26 +58,24 @@ final class ToolInvoker
         $startedAt = Carbon::now();
 
         if ($allowedTools !== null && ! in_array($name, $allowedTools, true)) {
-            $content = "[error: tool '{$name}' is not permitted on this channel]";
-            $this->persist($conversationId, $name, [], $content, InvocationStatus::RejectedAllowlist, null, $startedAt);
-
-            return new ToolInvocationResult(
-                message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->clock->now() - $invokeStart,
-                status: InvocationStatus::RejectedAllowlist,
+            return $this->reject(
+                callId: $callId, name: $name,
+                content: "[error: tool '{$name}' is not permitted on this channel]",
+                invokeStart: $invokeStart, startedAt: $startedAt,
+                conversationId: $conversationId, args: [],
+                status: InvocationStatus::RejectedAllowlist, error: null, emitFailed: false,
             );
         }
 
         $tool = $this->resolver->resolve($name);
 
         if ($tool === null) {
-            $content = "[error: tool '{$name}' not found in registry]";
-            $this->persist($conversationId, $name, [], $content, InvocationStatus::RejectedNotFound, null, $startedAt);
-
-            return new ToolInvocationResult(
-                message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->clock->now() - $invokeStart,
-                status: InvocationStatus::RejectedNotFound,
+            return $this->reject(
+                callId: $callId, name: $name,
+                content: "[error: tool '{$name}' not found in registry]",
+                invokeStart: $invokeStart, startedAt: $startedAt,
+                conversationId: $conversationId, args: [],
+                status: InvocationStatus::RejectedNotFound, error: null, emitFailed: false,
             );
         }
 
@@ -87,13 +85,13 @@ final class ToolInvoker
 
         if (! $this->validator->validate($tool->parameters(), $args)) {
             $content = 'arguments did not match schema';
-            $this->emitter->toolFailed($name);
-            $this->persist($conversationId, $name, $args, '', InvocationStatus::RejectedSchema, $content, $startedAt);
 
-            return new ToolInvocationResult(
-                message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->clock->now() - $invokeStart,
-                status: InvocationStatus::RejectedSchema,
+            return $this->reject(
+                callId: $callId, name: $name, content: $content,
+                invokeStart: $invokeStart, startedAt: $startedAt,
+                conversationId: $conversationId, args: $args,
+                status: InvocationStatus::RejectedSchema, error: $content, emitFailed: true,
+                persistResult: '',
             );
         }
 
@@ -103,14 +101,12 @@ final class ToolInvoker
 
         try {
             if (! $tool->authorize($actor, $invocation)) {
-                $content = "[error: not authorized to call tool '{$name}']";
-                $this->emitter->toolFailed($name);
-                $this->persist($conversationId, $name, $args, $content, InvocationStatus::RejectedUnauthorized, 'not authorized', $startedAt);
-
-                return new ToolInvocationResult(
-                    message: $this->message($callId, $name, $content),
-                    elapsedSeconds: $this->clock->now() - $invokeStart,
-                    status: InvocationStatus::RejectedUnauthorized,
+                return $this->reject(
+                    callId: $callId, name: $name,
+                    content: "[error: not authorized to call tool '{$name}']",
+                    invokeStart: $invokeStart, startedAt: $startedAt,
+                    conversationId: $conversationId, args: $args,
+                    status: InvocationStatus::RejectedUnauthorized, error: 'not authorized', emitFailed: true,
                 );
             }
 
@@ -130,16 +126,42 @@ final class ToolInvoker
                 status: InvocationStatus::Ok,
             );
         } catch (\Throwable $e) {
-            $content = "[error: tool '{$name}' threw an exception: {$e->getMessage()}]";
-            $this->emitter->toolFailed($name);
-            $this->persist($conversationId, $name, $args, $content, InvocationStatus::HandlerError, $e->getMessage(), $startedAt);
-
-            return new ToolInvocationResult(
-                message: $this->message($callId, $name, $content),
-                elapsedSeconds: $this->clock->now() - $invokeStart,
-                status: InvocationStatus::HandlerError,
+            return $this->reject(
+                callId: $callId, name: $name,
+                content: "[error: tool '{$name}' threw an exception: {$e->getMessage()}]",
+                invokeStart: $invokeStart, startedAt: $startedAt,
+                conversationId: $conversationId, args: $args,
+                status: InvocationStatus::HandlerError, error: $e->getMessage(), emitFailed: true,
             );
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     */
+    private function reject(
+        string $callId,
+        string $name,
+        string $content,
+        float $invokeStart,
+        \DateTimeInterface $startedAt,
+        int $conversationId,
+        array $args,
+        InvocationStatus $status,
+        ?string $error,
+        bool $emitFailed,
+        ?string $persistResult = null,
+    ): ToolInvocationResult {
+        if ($emitFailed) {
+            $this->emitter->toolFailed($name);
+        }
+        $this->persist($conversationId, $name, $args, $persistResult ?? $content, $status, $error, $startedAt);
+
+        return new ToolInvocationResult(
+            message: $this->message($callId, $name, $content),
+            elapsedSeconds: $this->clock->now() - $invokeStart,
+            status: $status,
+        );
     }
 
     /**
