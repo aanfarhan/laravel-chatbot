@@ -14,16 +14,36 @@ $fake = Chatbot::fake();
 
 ### `FakeClient` methods
 
+**Queueing responses** (consumed in FIFO order):
+
 | Method | Description |
 | --- | --- |
-| `addReply(string $content): void` | Queue a single assistant reply. Consumed in FIFO order. |
-| `queueToolCall(string $name, array $args): void` | Queue an assistant turn that emits a `tool_calls` payload with the given tool. The real tool handler runs against your real implementation. |
-| `assertCalledTimes(int $n): void` | Assert how many `chat()`/`stream()` invocations occurred. |
-| `assertLastPromptContains(string $needle): void` | Assert the last prompt sent to the fake contains `$needle`. Useful for verifying context made it into the system prompt. |
-| `flush(): void` | Empty queued replies. |
+| `respondWith(string $reply): self` | Queue a single text reply for the next `chat()` or `stream()` call. |
+| `respondWithStream(array $chunks): self` | Queue a sequence of string chunks as the next stream response. |
+| `respondWithToolCall(string $name, array $arguments, string $callId = 'call_1'): self` | Stage a single tool call as the next stream response. The real tool handler runs for real. |
+| `respondWithToolCalls(array $calls): self` | Stage multiple tool calls as the next stream response. Each entry is `['name' => ..., 'arguments' => ..., 'id' => ...]`. |
+| `throwDuringStream(\Throwable $exception, array $chunksBefore = []): self` | Queue an exception thrown mid-stream, optionally after some chunks. |
+
+**Assertions:**
+
+| Method | Description |
+| --- | --- |
+| `assertSentPrompt(callable $callback): void` | Assert that at least one recorded prompt satisfied `$callback(array $messages): bool`. |
+| `assertSentWithModel(string $model): void` | Assert a call was made with the given model string. |
+| `assertNothingSent(): void` | Assert no `chat()` or `stream()` calls occurred. |
+| `assertToolCalled(string $name, ?callable $argsCallback = null): void` | Assert a tool result message for `$name` appears in the recorded prompts. Pass `$argsCallback(array $args): bool` to also assert on arguments. |
+| `assertToolNotCalled(string $name): void` | Assert no tool result message for `$name` was recorded. |
+
+**Inspection:**
+
+| Method | Description |
+| --- | --- |
+| `recordedPrompts(): array` | Return all recorded message arrays, in call order. |
+| `lastSentTools(): array` | Return the tool definitions passed on the last `stream()` call. |
+| `wasStreamAborted(): bool` | Return whether the last stream generator was abandoned before exhaustion. |
 
 ::: tip
-The fake honours the full tool-call loop: if you `queueToolCall()` followed by `addReply()`, your tool's `authorize()` and `handle()` run for real, the result is appended, and the queued reply closes the turn. This makes it a true end-to-end fake, not a mock.
+The fake honours the full tool-call loop: if you `respondWithToolCall()` followed by `respondWith()`, your tool's `authorize()` and `handle()` run for real, the result is appended, and the queued reply closes the turn. This makes it a true end-to-end fake, not a mock.
 :::
 
 ## `InteractsWithChatbot` trait
@@ -57,21 +77,23 @@ Chatbot::registerTool(\App\Chatbot\Tools\LookupOrderTool::class);
 $this->get('/orders/1');
 $this->post('/chatbot/messages', [...]);
 
-$fake->assertLastPromptContains('"name": "lookup_order"');
+$fake->assertSentPrompt(fn ($messages) => collect($messages)->contains(
+    fn ($m) => str_contains(json_encode($m), '"name":"lookup_order"')
+));
 ```
 
 ### Asserting a tool actually ran
 
 ```php
 $fake = Chatbot::fake();
-$fake->queueToolCall('lookup_order', ['order_id' => 1]);
-$fake->addReply('Your order ships tomorrow.');
+$fake->respondWithToolCall('lookup_order', ['order_id' => 1]);
+$fake->respondWith('Your order ships tomorrow.');
 
 $this->post('/chatbot/messages', [...]);
 
 $this->assertDatabaseHas('chatbot_tool_invocations', [
     'tool_name' => 'lookup_order',
-    'status'    => 'success',
+    'status'    => 'ok',
 ]);
 ```
 

@@ -43,22 +43,35 @@ Provider/quota/timeout errors arrive on the open stream as `error` SSE events, n
 
 ## `GET /chatbot/conversations/{id}/messages`
 
-Fetch the persisted message history for a conversation.
+Fetch the persisted message history for a conversation. `{id}` is the conversation's public UUID (string).
+
+### Query parameters
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `signed_context` | ✓ | The signed envelope minted by `@chatbot` at page render. The envelope's identity is used to verify ownership. |
 
 ### Response
 
 ```json
 {
-  "conversation_id": 123,
-  "channel": "default",
   "messages": [
-    { "role": "user",      "content": "Where is my order?",       "created_at": "..." },
-    { "role": "assistant", "content": "It ships tomorrow.",       "created_at": "..." }
+    { "role": "user",      "content": "Where is my order?", "route_name": "orders.show", "context_hash": "abc123", "created_at": "2024-01-01T00:00:00+00:00" },
+    { "role": "assistant", "content": "It ships tomorrow.", "route_name": "orders.show", "context_hash": "abc123", "created_at": "2024-01-01T00:00:01+00:00" }
   ]
 }
 ```
 
-Access control: the controller resolves the conversation and 404s for any caller other than its owning user (or guest token).
+If the channel has a `greeting` configured it is prepended as the first message (`role: assistant`) and is not stored in the database.
+
+### Errors
+
+| Status | Cause |
+| --- | --- |
+| `403` | Missing or invalid `signed_context`, or the conversation belongs to a different identity. |
+| `404` | No conversation with that UUID. |
+
+Access control uses the verified envelope identity — the conversation must be owned by that user (or matching guest token).
 
 ## `GET /chatbot/health`
 

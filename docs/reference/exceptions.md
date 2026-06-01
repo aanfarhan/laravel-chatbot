@@ -47,6 +47,10 @@ ChatbotException (abstract)
 | `MismatchedEnvelopeException` | `invalid_envelope` | `false` | The envelope was minted for a different route / channel / user. |
 | `TamperedEnvelopeException` | `invalid_envelope` | `false` | HMAC signature mismatch. |
 
+## Outside the hierarchy
+
+`InvalidExtractorPayloadException` (`Aanfarhan\Chatbot\Exceptions\InvalidExtractorPayloadException`) extends `\RuntimeException` directly — it is not a `ChatbotException`. It is thrown when a client-extractor payload fails internal validation and is caught by `MessagesController`, which turns it into a `422` response. You will not encounter it in normal application code.
+
 ## Where they surface
 
 | Exception | Surface |

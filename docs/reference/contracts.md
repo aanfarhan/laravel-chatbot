@@ -111,6 +111,27 @@ Bind your implementation in a service provider:
 $this->app->bind(\Aanfarhan\Chatbot\Contracts\LLMClient::class, MyClient::class);
 ```
 
+## `ToolResolver`
+
+The registry interface the package uses to look up registered tools and build tool-definition arrays for the LLM. Implement this only if you're replacing the built-in tool registry entirely (rare).
+
+```php
+namespace Aanfarhan\Chatbot\Contracts;
+
+interface ToolResolver
+{
+    public function resolve(string $name): ?ChatbotTool;
+
+    /**
+     * @param  list<string>|null  $allowedTools
+     * @return list<array<string, mixed>>
+     */
+    public function definitions(?array $allowedTools): array;
+}
+```
+
+The interface is **internal** for v1 — rebinding it pins you to a moving target.
+
 ## `ConversationStore` and `ToolInvocationStore`
 
 The default Eloquent-backed implementations are `Aanfarhan\Chatbot\Stores\EloquentConversationStore` and `Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore`. These interfaces exist so hosts can swap in alternative persistence (e.g., a different database, a queue-based writer) by rebinding in a service provider:

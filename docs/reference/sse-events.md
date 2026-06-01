@@ -1,6 +1,6 @@
 # SSE events
 
-`POST /chatbot/messages` returns a `text/event-stream` response. Each event is a JSON object with a `type` field plus type-specific fields. The shape is part of the [public contract](/guide/semver).
+`POST /chatbot/messages` returns a `text/event-stream` response. Each SSE frame carries an `event:` header that names the event type and a `data:` line with a JSON payload containing type-specific fields. The shape is part of the [public contract](/guide/semver).
 
 ## Event types
 
@@ -11,7 +11,7 @@
 | `tool_started` | `name: string`, `phase: "started"` | A tool invocation has begun. |
 | `tool_finished` | `name: string`, `phase: "finished"` | A tool invocation completed successfully. |
 | `tool_failed` | `name: string`, `phase: "failed"` | A tool invocation failed (schema rejection, `authorize()` returned false, handler exception, timeout, budget exhausted). |
-| `done` | `conversation_id: int`, `usage: { input_tokens: int, output_tokens: int }` | Final event in a successful stream. Sent exactly once. |
+| `done` | `conversation_id: string`, `usage: { input_tokens: int, output_tokens: int }` | Final event in a successful stream. Sent exactly once. `conversation_id` is the conversation's public UUID. |
 | `error` | `code: string`, `message: string`, `retryable: bool` | Terminal error. The stream closes immediately after. |
 
 ::: warning
@@ -39,7 +39,7 @@ See [Exceptions](./exceptions) for the full hierarchy.
 
 ### JavaScript (browser)
 
-The bundled web component handles this for you. If you're writing a custom frontend:
+The bundled web component handles this for you. If you're writing a custom frontend, each SSE frame consists of an `event:` line followed by a `data:` line — parse both:
 
 ```js
 const res = await fetch('/chatbot/messages', {
@@ -56,10 +56,23 @@ while (true) {
   const { done, value } = await reader.read()
   if (done) break
   buf += decoder.decode(value, { stream: true })
-  for (const line of buf.split('\n\n')) {
-    if (!line.startsWith('data: ')) continue
-    const evt = JSON.parse(line.slice(6))
-    switch (evt.type) {
+
+  let boundary
+  while ((boundary = buf.indexOf('\n\n')) !== -1) {
+    const block = buf.slice(0, boundary)
+    buf = buf.slice(boundary + 2)
+
+    let eventType = 'message'
+    let data = ''
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event: ')) eventType = line.slice(7)
+      else if (line.startsWith('data: ')) data = line.slice(6)
+    }
+
+    if (!data) continue
+    const evt = JSON.parse(data)
+
+    switch (eventType) {
       case 'token':         appendToken(evt.content); break
       case 'tool_started':  showToolChip(evt.name); break
       case 'tool_finished': clearToolChip(evt.name); break
@@ -68,24 +81,30 @@ while (true) {
       case 'error':         showError(evt.code, evt.message); break
     }
   }
-  buf = buf.endsWith('\n\n') ? '' : buf.slice(buf.lastIndexOf('\n\n') + 2)
 }
 ```
 
 ### Example wire output
 
 ```
-data: {"type":"context_summary","summary":"You assist customers on the order details page."}
+event: context_summary
+data: {"summary":"You assist customers on the order details page."}
 
-data: {"type":"tool_started","name":"lookup_order","phase":"started"}
+event: tool_started
+data: {"name":"lookup_order","phase":"started"}
 
-data: {"type":"tool_finished","name":"lookup_order","phase":"finished"}
+event: tool_finished
+data: {"name":"lookup_order","phase":"finished"}
 
-data: {"type":"token","content":"Your "}
+event: token
+data: {"content":"Your "}
 
-data: {"type":"token","content":"order "}
+event: token
+data: {"content":"order "}
 
-data: {"type":"token","content":"ships tomorrow."}
+event: token
+data: {"content":"ships tomorrow."}
 
-data: {"type":"done","conversation_id":123,"usage":{"input_tokens":412,"output_tokens":18}}
+event: done
+data: {"conversation_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"input_tokens":412,"output_tokens":18}}
 ```
