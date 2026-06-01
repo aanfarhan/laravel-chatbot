@@ -134,6 +134,27 @@ final class FakeClient implements LLMClient
     }
 
     /**
+     * Stage a tool call with preceding text content as the next stream response.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    public function respondWithToolCallAndText(string $name, array $arguments, string $callId, string $text): self
+    {
+        $toolCall = [
+            'id' => $callId,
+            'name' => $name,
+            'arguments' => json_encode($arguments, JSON_THROW_ON_ERROR),
+        ];
+
+        $this->streamQueue[] = [
+            new StreamChunk($text),
+            new StreamChunk('', toolCalls: [$toolCall]),
+        ];
+
+        return $this;
+    }
+
+    /**
      * Stage multiple tool calls as the next stream response.
      *
      * @param  list<array{name: string, arguments: array<string, mixed>, id: string}>  $calls

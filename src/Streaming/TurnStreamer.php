@@ -89,16 +89,7 @@ final class TurnStreamer
                     break;
                 }
 
-                $assistantMsg = ['role' => 'assistant', 'content' => $iterText !== '' ? $iterText : null];
-                $assistantMsg['tool_calls'] = array_map(
-                    fn (array $tc): array => [
-                        'id' => $tc['id'],
-                        'type' => 'function',
-                        'function' => ['name' => $tc['name'], 'arguments' => $tc['arguments']],
-                    ],
-                    $iterToolCalls,
-                );
-                $loopMessages[] = $assistantMsg;
+                $loopMessages[] = $this->assembleTurnMessages($iterToolCalls, $iterText);
 
                 foreach ($iterToolCalls as $tc) {
                     if ($callsThisTurn >= $maxCalls) {
@@ -141,5 +132,24 @@ final class TurnStreamer
         }
 
         return new TurnResult($assembled, $usage, TurnOutcome::Completed, null);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $iterToolCalls
+     * @return array<string, mixed>
+     */
+    private function assembleTurnMessages(array $iterToolCalls, string $iterText): array
+    {
+        $msg = ['role' => 'assistant', 'content' => $iterText !== '' ? $iterText : null];
+        $msg['tool_calls'] = array_map(
+            fn (array $tc): array => [
+                'id' => $tc['id'],
+                'type' => 'function',
+                'function' => ['name' => $tc['name'], 'arguments' => $tc['arguments']],
+            ],
+            $iterToolCalls,
+        );
+
+        return $msg;
     }
 }

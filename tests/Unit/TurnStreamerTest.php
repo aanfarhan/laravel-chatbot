@@ -299,3 +299,71 @@ it('feeds back [error: no tool handler configured] when toolInvoker is null', fu
         && str_contains((string) ($m['content'] ?? ''), 'no tool handler configured'));
     expect(count($noHandlerMessages))->toBe(1);
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Slice 8 – assistant message shape when tool calls present
+// ──────────────────────────────────────────────────────────────────────────────
+
+it('assembles assistant message with correct tool_calls shape and null content when no text', function (): void {
+    $client = new FakeClient;
+    $client->respondWithToolCall('my_tool', ['x' => 1], 'call_abc');
+    $client->respondWithStream(['ok']);
+
+    $now = 0.0;
+    $emitter = new RecordingStreamEmitter;
+    $streamer = new TurnStreamer($client, $emitter, null, new Clock(fn () => $now));
+
+    $streamer->run(
+        messages: [['role' => 'user', 'content' => 'go']],
+        toolDefs: [['type' => 'function', 'function' => ['name' => 'my_tool']]],
+        maxCalls: 5,
+        streamDuration: 60,
+        startedAt: 0.0,
+        isAborted: fn () => false,
+        model: null,
+        channel: 'default',
+        conversationId: 1,
+        actor: null,
+        allowedTools: null,
+    );
+
+    $secondRound = $client->recordedPrompts()[1] ?? [];
+    $assistantMsg = array_values(array_filter($secondRound, fn ($m) => ($m['role'] ?? '') === 'assistant'))[0] ?? null;
+
+    expect($assistantMsg)->not->toBeNull();
+    expect($assistantMsg['content'])->toBeNull();
+    expect($assistantMsg['tool_calls'])->toHaveCount(1);
+    expect($assistantMsg['tool_calls'][0]['id'])->toBe('call_abc');
+    expect($assistantMsg['tool_calls'][0]['type'])->toBe('function');
+    expect($assistantMsg['tool_calls'][0]['function']['name'])->toBe('my_tool');
+});
+
+it('assembles assistant message with text content when LLM emits text before tool calls', function (): void {
+    $client = new FakeClient;
+    $client->respondWithToolCallAndText('my_tool', [], 'call_xyz', 'thinking...');
+    $client->respondWithStream(['done']);
+
+    $now = 0.0;
+    $emitter = new RecordingStreamEmitter;
+    $streamer = new TurnStreamer($client, $emitter, null, new Clock(fn () => $now));
+
+    $streamer->run(
+        messages: [['role' => 'user', 'content' => 'go']],
+        toolDefs: [['type' => 'function', 'function' => ['name' => 'my_tool']]],
+        maxCalls: 5,
+        streamDuration: 60,
+        startedAt: 0.0,
+        isAborted: fn () => false,
+        model: null,
+        channel: 'default',
+        conversationId: 1,
+        actor: null,
+        allowedTools: null,
+    );
+
+    $secondRound = $client->recordedPrompts()[1] ?? [];
+    $assistantMsg = array_values(array_filter($secondRound, fn ($m) => ($m['role'] ?? '') === 'assistant'))[0] ?? null;
+
+    expect($assistantMsg)->not->toBeNull();
+    expect($assistantMsg['content'])->toBe('thinking...');
+});
