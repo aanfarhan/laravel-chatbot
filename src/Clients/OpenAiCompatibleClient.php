@@ -96,6 +96,7 @@ final class OpenAiCompatibleClient implements LLMClient
             'model' => $model ?? $this->model,
             'messages' => $messages,
             'stream' => true,
+            'stream_options' => ['include_usage' => true],
         ];
 
         if ($tools !== []) {

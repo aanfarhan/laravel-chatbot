@@ -226,6 +226,36 @@ it('maps ConnectException from chat send to ChatbotProviderException with retrya
     }
 });
 
+it('requests usage in the stream via stream_options.include_usage', function (): void {
+    $sse = "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n\n";
+    $mock = new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], $sse)]);
+    $history = [];
+    $client = buildOpenAiClient($mock, $history);
+
+    iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']]));
+
+    $payload = json_decode((string) $history[0]['request']->getBody(), true);
+    expect($payload['stream'])->toBeTrue();
+    expect($payload['stream_options'])->toBe(['include_usage' => true]);
+});
+
+it('parses the final usage-only chunk (empty choices) into a StreamChunk', function (): void {
+    $content = json_encode(['choices' => [['delta' => ['content' => 'hi'], 'finish_reason' => null]]]);
+    $usage = json_encode(['choices' => [], 'usage' => ['prompt_tokens' => 31, 'completion_tokens' => 7]]);
+    $sse = "data: $content\n\ndata: $usage\n\ndata: [DONE]\n\n";
+
+    $mock = new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], $sse)]);
+    $history = [];
+    $client = buildOpenAiClient($mock, $history);
+
+    $chunks = iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']]));
+
+    $usageChunk = array_values(array_filter($chunks, fn ($c) => $c->usage !== null));
+    expect($usageChunk)->toHaveCount(1);
+    expect($usageChunk[0]->usage->inputTokens)->toBe(31);
+    expect($usageChunk[0]->usage->outputTokens)->toBe(7);
+});
+
 it('accumulates multiple tool_call deltas across chunks by index', function (): void {
     // Two parallel tool calls, each receiving their arguments in fragments
     $c1 = json_encode(['choices' => [['delta' => ['tool_calls' => [
