@@ -20,9 +20,9 @@ final class LlmHttpClientFactory
             : HandlerStack::create();
 
         return new GuzzleClient([
-            'handler'         => $handler,
+            'handler' => $handler,
             'connect_timeout' => $options['connect_timeout'],
-            'read_timeout'    => $options['read_timeout'],
+            'read_timeout' => $options['read_timeout'],
         ]);
     }
 }

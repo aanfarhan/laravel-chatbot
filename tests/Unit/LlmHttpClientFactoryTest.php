@@ -10,7 +10,7 @@ use GuzzleHttp\HandlerStack;
 it('make() returns a GuzzleClient with connect_timeout and read_timeout', function (): void {
     $client = LlmHttpClientFactory::make([
         'connect_timeout' => 5.0,
-        'read_timeout'    => 45.0,
+        'read_timeout' => 45.0,
     ]);
 
     expect($client)->toBeInstanceOf(GuzzleClient::class);
@@ -24,7 +24,7 @@ it('make() uses a HandlerStack wrapping CurlHandler when curl extension is loade
     }
 
     $client = LlmHttpClientFactory::make(['connect_timeout' => 5.0, 'read_timeout' => 30.0]);
-    $stack  = $client->getConfig('handler');
+    $stack = $client->getConfig('handler');
 
     expect($stack)->toBeInstanceOf(HandlerStack::class);
 

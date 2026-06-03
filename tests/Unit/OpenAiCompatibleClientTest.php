@@ -7,9 +7,11 @@ use Aanfarhan\Chatbot\Exceptions\ChatbotConfigurationException;
 use Aanfarhan\Chatbot\Exceptions\ChatbotProviderException;
 use Aanfarhan\Chatbot\Responses\ChatResponse;
 use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use Psr\Log\LoggerInterface;
@@ -190,36 +192,36 @@ it('assembles streamed tool_call deltas and yields them as a single chunk on fin
 
 it('maps ConnectException from stream send to ChatbotProviderException with retryable=true', function (): void {
     $mock = new MockHandler([
-        new GuzzleHttp\Exception\ConnectException(
+        new ConnectException(
             'cURL error 28: Operation timed out',
-            new GuzzleHttp\Psr7\Request('POST', '/chat/completions'),
+            new Request('POST', '/chat/completions'),
         ),
     ]);
     $history = [];
-    $client  = buildOpenAiClient($mock, $history);
+    $client = buildOpenAiClient($mock, $history);
 
     try {
         iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']]));
         expect(false)->toBeTrue('expected exception not thrown');
-    } catch (Aanfarhan\Chatbot\Exceptions\ChatbotProviderException $e) {
+    } catch (ChatbotProviderException $e) {
         expect($e->isRetryable())->toBeTrue();
     }
 });
 
 it('maps ConnectException from chat send to ChatbotProviderException with retryable=true', function (): void {
     $mock = new MockHandler([
-        new GuzzleHttp\Exception\ConnectException(
+        new ConnectException(
             'cURL error 28: Operation timed out',
-            new GuzzleHttp\Psr7\Request('POST', '/chat/completions'),
+            new Request('POST', '/chat/completions'),
         ),
     ]);
     $history = [];
-    $client  = buildOpenAiClient($mock, $history);
+    $client = buildOpenAiClient($mock, $history);
 
     try {
         $client->chat([['role' => 'user', 'content' => 'hi']]);
         expect(false)->toBeTrue('expected exception not thrown');
-    } catch (Aanfarhan\Chatbot\Exceptions\ChatbotProviderException $e) {
+    } catch (ChatbotProviderException $e) {
         expect($e->isRetryable())->toBeTrue();
     }
 });

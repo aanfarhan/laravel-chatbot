@@ -14,6 +14,7 @@ use Aanfarhan\Chatbot\Contracts\ToolInvocationStore;
 use Aanfarhan\Chatbot\Envelopes\ContextEnvelope;
 use Aanfarhan\Chatbot\Extractors\ClientExtractorRegistry;
 use Aanfarhan\Chatbot\Facades\Chatbot as ChatbotFacade;
+use Aanfarhan\Chatbot\Http\LlmHttpClientFactory;
 use Aanfarhan\Chatbot\Stores\EloquentConversationStore;
 use Aanfarhan\Chatbot\Stores\EloquentToolInvocationStore;
 use Aanfarhan\Chatbot\Streaming\SseStreamEmitter;
@@ -24,7 +25,6 @@ use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
-use Aanfarhan\Chatbot\Http\LlmHttpClientFactory;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
@@ -149,7 +149,7 @@ final class ChatbotServiceProvider extends ServiceProvider
             return new OpenAiCompatibleClient(
                 LlmHttpClientFactory::make([
                     'connect_timeout' => (float) $config->get('chatbot.connect_timeout', 10),
-                    'read_timeout'    => (float) $config->get('chatbot.read_timeout', $config->get('chatbot.stream_duration', 60)),
+                    'read_timeout' => (float) $config->get('chatbot.read_timeout', $config->get('chatbot.stream_duration', 60)),
                 ]),
                 baseUrl: $config->string('chatbot.base_url'),
                 apiKey: $config->string('chatbot.api_key', ''),
