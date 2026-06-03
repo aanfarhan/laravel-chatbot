@@ -186,6 +186,44 @@ it('assembles streamed tool_call deltas and yields them as a single chunk on fin
     expect($chunk->toolCalls[0]['arguments'])->toBe('{"city":"NYC"}');
 });
 
+// --- Transport timeout mapping ---
+
+it('maps ConnectException from stream send to ChatbotProviderException with retryable=true', function (): void {
+    $mock = new MockHandler([
+        new GuzzleHttp\Exception\ConnectException(
+            'cURL error 28: Operation timed out',
+            new GuzzleHttp\Psr7\Request('POST', '/chat/completions'),
+        ),
+    ]);
+    $history = [];
+    $client  = buildOpenAiClient($mock, $history);
+
+    try {
+        iterator_to_array($client->stream([['role' => 'user', 'content' => 'hi']]));
+        expect(false)->toBeTrue('expected exception not thrown');
+    } catch (Aanfarhan\Chatbot\Exceptions\ChatbotProviderException $e) {
+        expect($e->isRetryable())->toBeTrue();
+    }
+});
+
+it('maps ConnectException from chat send to ChatbotProviderException with retryable=true', function (): void {
+    $mock = new MockHandler([
+        new GuzzleHttp\Exception\ConnectException(
+            'cURL error 28: Operation timed out',
+            new GuzzleHttp\Psr7\Request('POST', '/chat/completions'),
+        ),
+    ]);
+    $history = [];
+    $client  = buildOpenAiClient($mock, $history);
+
+    try {
+        $client->chat([['role' => 'user', 'content' => 'hi']]);
+        expect(false)->toBeTrue('expected exception not thrown');
+    } catch (Aanfarhan\Chatbot\Exceptions\ChatbotProviderException $e) {
+        expect($e->isRetryable())->toBeTrue();
+    }
+});
+
 it('accumulates multiple tool_call deltas across chunks by index', function (): void {
     // Two parallel tool calls, each receiving their arguments in fragments
     $c1 = json_encode(['choices' => [['delta' => ['tool_calls' => [

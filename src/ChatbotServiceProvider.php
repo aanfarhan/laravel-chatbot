@@ -24,8 +24,8 @@ use Aanfarhan\Chatbot\Testing\Fixtures\LookupOrderTool;
 use Aanfarhan\Chatbot\Testing\Fixtures\PlaywrightFixtureClient;
 use Aanfarhan\Chatbot\Tools\ToolArgumentValidator;
 use Aanfarhan\Chatbot\Tools\ToolInvoker;
+use Aanfarhan\Chatbot\Http\LlmHttpClientFactory;
 use Aanfarhan\Chatbot\Tools\ToolRegistry;
-use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Blade;
@@ -147,7 +147,10 @@ final class ChatbotServiceProvider extends ServiceProvider
             }
 
             return new OpenAiCompatibleClient(
-                new GuzzleClient,
+                LlmHttpClientFactory::make([
+                    'connect_timeout' => (float) $config->get('chatbot.connect_timeout', 10),
+                    'read_timeout'    => (float) $config->get('chatbot.read_timeout', $config->get('chatbot.stream_duration', 60)),
+                ]),
                 baseUrl: $config->string('chatbot.base_url'),
                 apiKey: $config->string('chatbot.api_key', ''),
                 model: $config->string('chatbot.model'),

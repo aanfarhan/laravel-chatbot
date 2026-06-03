@@ -12,6 +12,7 @@ use Aanfarhan\Chatbot\Responses\StreamChunk;
 use Aanfarhan\Chatbot\Responses\Usage;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\BadResponseException;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use Psr\Http\Message\StreamInterface;
 use Psr\Log\LoggerInterface;
@@ -44,7 +45,11 @@ final class OpenAiCompatibleClient implements LLMClient
             $body,
         );
 
-        $response = $this->http->send($request);
+        try {
+            $response = $this->http->send($request);
+        } catch (ConnectException $e) {
+            throw new ChatbotProviderException('Provider connection failed', retryable: true, previous: $e);
+        }
 
         /** @var array{
          *   choices: list<array{message: array{role: string, content: string}}>,
@@ -112,6 +117,8 @@ final class OpenAiCompatibleClient implements LLMClient
 
         try {
             $response = $this->http->send($request, ['stream' => true]);
+        } catch (ConnectException $e) {
+            throw new ChatbotProviderException('Provider connection failed', retryable: true, previous: $e);
         } catch (BadResponseException $e) {
             $status = $e->getResponse()->getStatusCode();
 

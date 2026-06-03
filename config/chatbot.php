@@ -48,6 +48,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | HTTP connect timeout
+    |--------------------------------------------------------------------------
+    | Maximum seconds to wait for the initial TCP/TLS connection to the LLM
+    | provider. Distinct from stream_duration (total wall-clock budget).
+    */
+    'connect_timeout' => (int) env('CHATBOT_CONNECT_TIMEOUT', 10),
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP read timeout
+    |--------------------------------------------------------------------------
+    | Maximum idle gap (seconds) between SSE chunks before the transport aborts
+    | with a clean ConnectException → ChatbotProviderException. Distinct from
+    | stream_duration. Defaults to stream_duration when not set.
+    */
+    'read_timeout' => (int) env('CHATBOT_READ_TIMEOUT', (int) env('CHATBOT_STREAM_DURATION', 60)),
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention policy
     |--------------------------------------------------------------------------
     | Days after last activity before chatbot:prune hard-deletes a conversation.
