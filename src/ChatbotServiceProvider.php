@@ -149,7 +149,7 @@ final class ChatbotServiceProvider extends ServiceProvider
             return new OpenAiCompatibleClient(
                 LlmHttpClientFactory::make([
                     'connect_timeout' => (float) $config->integer('chatbot.connect_timeout', 10),
-                    'read_timeout'    => (float) $config->integer(
+                    'read_timeout' => (float) $config->integer(
                         'chatbot.read_timeout',
                         $config->integer('chatbot.stream_duration', 60),
                     ),
